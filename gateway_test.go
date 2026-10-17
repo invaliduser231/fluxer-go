@@ -275,10 +275,3 @@ func TestGatewaySurvivesOverflowingHeartbeatInterval(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
-
-func setup(t *testing.T) (*fluxertest.Server, *fluxer.Client) {
-	t.Helper()
-	srv := fluxertest.NewServer("1000.secret")
-	t.Cleanup(srv.Close)
-	return srv, srv.Client()
-}
