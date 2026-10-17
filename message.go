@@ -1,6 +1,12 @@
 package fluxer
 
-import "time"
+import (
+	"context"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+)
 
 const (
 	MessageDefault              = 0
@@ -153,4 +159,121 @@ type MessageEdit struct {
 	Embeds          *[]Embed         `json:"embeds,omitempty"`
 	AllowedMentions *AllowedMentions `json:"allowed_mentions,omitempty"`
 	Flags           *int             `json:"flags,omitempty"`
+}
+
+type MessageQuery struct {
+	Before string
+	After  string
+	Around string
+	Limit  int
+}
+
+func (q MessageQuery) values() url.Values {
+	v := url.Values{}
+	if q.Limit > 0 {
+		v.Set("limit", strconv.Itoa(q.Limit))
+	}
+	for key, id := range map[string]string{"before": q.Before, "after": q.After, "around": q.Around} {
+		if id != "" {
+			v.Set(key, id)
+		}
+	}
+	return v
+}
+
+type PinnedMessage struct {
+	Message  Message   `json:"message"`
+	PinnedAt time.Time `json:"pinned_at"`
+}
+
+type ChannelPins struct {
+	Items   []PinnedMessage `json:"items"`
+	HasMore bool            `json:"has_more"`
+}
+
+func messagesPath(channelID string) string { return "/channels/" + channelID + "/messages" }
+
+func (c *Client) SendMessage(ctx context.Context, channelID string, m MessageSend) (*Message, error) {
+	return c.SendMessageFiles(ctx, channelID, m, nil)
+}
+
+func (c *Client) SendMessageFiles(ctx context.Context, channelID string, m MessageSend, files []File) (*Message, error) {
+	if m.Nonce == "" {
+		m.Nonce = newNonce()
+	}
+	var msg Message
+	return &msg, c.DoFiles(ctx, http.MethodPost, messagesPath(channelID), m, files, &msg)
+}
+
+func (c *Client) SendText(ctx context.Context, channelID, content string) (*Message, error) {
+	return c.SendMessage(ctx, channelID, MessageSend{Content: content})
+}
+
+func (c *Client) Reply(ctx context.Context, to *Message, m MessageSend) (*Message, error) {
+	m.MessageReference = &MessageReference{MessageID: to.ID, ChannelID: to.ChannelID, GuildID: to.GuildID}
+	return c.SendMessage(ctx, to.ChannelID, m)
+}
+
+func (c *Client) EditMessage(ctx context.Context, channelID, messageID string, m MessageEdit) (*Message, error) {
+	var msg Message
+	return &msg, c.Do(ctx, http.MethodPatch, messagesPath(channelID)+"/"+messageID, m, &msg)
+}
+
+func (c *Client) DeleteMessage(ctx context.Context, channelID, messageID string) error {
+	return c.Do(ctx, http.MethodDelete, messagesPath(channelID)+"/"+messageID, nil, nil)
+}
+
+func (c *Client) Message(ctx context.Context, channelID, messageID string) (*Message, error) {
+	var msg Message
+	return &msg, c.Do(ctx, http.MethodGet, messagesPath(channelID)+"/"+messageID, nil, &msg)
+}
+
+func (c *Client) Messages(ctx context.Context, channelID string, q MessageQuery) ([]Message, error) {
+	path := messagesPath(channelID)
+	if v := q.values(); len(v) > 0 {
+		path += "?" + v.Encode()
+	}
+	var msgs []Message
+	return msgs, c.Do(ctx, http.MethodGet, path, nil, &msgs)
+}
+
+func (c *Client) BulkDelete(ctx context.Context, channelID string, ids []string) error {
+	return c.Do(ctx, http.MethodPost, messagesPath(channelID)+"/bulk-delete", map[string][]string{"message_ids": ids}, nil)
+}
+
+func (c *Client) DeleteAttachment(ctx context.Context, channelID, messageID, attachmentID string) error {
+	return c.Do(ctx, http.MethodDelete, messagesPath(channelID)+"/"+messageID+"/attachments/"+attachmentID, nil, nil)
+}
+
+func (c *Client) Crosspost(ctx context.Context, channelID, messageID string) (*Message, error) {
+	var msg Message
+	return &msg, c.Do(ctx, http.MethodPost, messagesPath(channelID)+"/"+messageID+"/crosspost", nil, &msg)
+}
+
+func (c *Client) Typing(ctx context.Context, channelID string) error {
+	return c.Do(ctx, http.MethodPost, "/channels/"+channelID+"/typing", nil, nil)
+}
+
+func (c *Client) Pin(ctx context.Context, channelID, messageID string) error {
+	return c.Do(ctx, http.MethodPut, "/channels/"+channelID+"/pins/"+messageID, nil, nil)
+}
+
+func (c *Client) Unpin(ctx context.Context, channelID, messageID string) error {
+	return c.Do(ctx, http.MethodDelete, "/channels/"+channelID+"/pins/"+messageID, nil, nil)
+}
+
+func (c *Client) Pins(ctx context.Context, channelID string, before time.Time, limit int) (*ChannelPins, error) {
+	v := url.Values{}
+	if !before.IsZero() {
+		v.Set("before", before.UTC().Format(time.RFC3339Nano))
+	}
+	if limit > 0 {
+		v.Set("limit", strconv.Itoa(limit))
+	}
+	path := messagesPath(channelID) + "/pins"
+	if len(v) > 0 {
+		path += "?" + v.Encode()
+	}
+	var p ChannelPins
+	return &p, c.Do(ctx, http.MethodGet, path, nil, &p)
 }
