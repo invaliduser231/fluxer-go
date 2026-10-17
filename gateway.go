@@ -387,7 +387,7 @@ func (b *beat) ack() time.Duration {
 		return 0
 	}
 	b.acked = true
-	return time.Since(b.sentAt)
+	return max(time.Since(b.sentAt), time.Microsecond)
 }
 
 func (s *Session) heartbeat(ctx context.Context, conn *websocket.Conn, interval time.Duration, b *beat) error {
