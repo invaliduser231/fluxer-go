@@ -35,6 +35,7 @@ type Server struct {
 	exhaust  map[string]float64
 	messages map[string][]fluxer.Message
 	gw       gatewayState
+	gs       guildState
 	ban      map[string]any
 	delay    time.Duration
 }
@@ -73,6 +74,7 @@ func NewServer(token string) *Server {
 	}))
 	s.gatewayRoutes()
 	s.messageRoutes()
+	s.guildRoutes()
 	s.Server = httptest.NewServer(s.mux)
 	return s
 }
