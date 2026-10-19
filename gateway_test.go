@@ -44,6 +44,20 @@ func start(t *testing.T, srv *fluxertest.Server, token string) (*fluxer.Session,
 	return s, events, done
 }
 
+func runSession(t *testing.T, s *fluxer.Session) {
+	t.Helper()
+	if s.MinBackoff == 0 {
+		s.MinBackoff, s.MaxBackoff = 10*time.Millisecond, 50*time.Millisecond
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- s.Run(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
 func expect(t *testing.T, events chan event, name string) event {
 	t.Helper()
 	timeout := time.After(3 * time.Second)
