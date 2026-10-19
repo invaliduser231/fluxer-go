@@ -48,7 +48,7 @@ func TestGuild(t *testing.T) {
 func TestRoles(t *testing.T) {
 	_, c := guildSetup(t)
 	ctx := context.Background()
-	role, err := c.CreateRole(ctx, "3", fluxer.RoleCreate{Name: "mods", Color: 0xff0000})
+	role, err := c.CreateRole(ctx, "3", fluxer.NewRole{Name: "mods", Color: 0xff0000})
 	if err != nil || role.ID == "" || role.Name != "mods" {
 		t.Fatalf("got %+v, %v", role, err)
 	}
@@ -104,7 +104,7 @@ func TestMembers(t *testing.T) {
 func TestBans(t *testing.T) {
 	srv, c := guildSetup(t)
 	ctx := context.Background()
-	if err := c.Ban(ctx, "3", "7", fluxer.BanCreate{DeleteMessageSeconds: 3600, Reason: "spam"}); err != nil {
+	if err := c.Ban(ctx, "3", "7", fluxer.BanOptions{DeleteMessageSeconds: 3600, Reason: "spam"}); err != nil {
 		t.Fatal(err)
 	}
 	bans, err := c.Bans(ctx, "3")

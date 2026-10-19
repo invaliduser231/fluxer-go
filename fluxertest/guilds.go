@@ -96,7 +96,7 @@ func (s *Server) guildRoutes() {
 		writeJSON(w, append([]fluxer.Role{}, g.Roles...))
 	}))
 	s.Handle("POST /v1/guilds/{guild}/roles", withGuild(func(w http.ResponseWriter, r *http.Request, g *fluxer.Guild) {
-		var body fluxer.RoleCreate
+		var body fluxer.NewRole
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		role := fluxer.Role{ID: s.newID(), Name: body.Name, Color: body.Color, Permissions: body.Permissions, Position: len(g.Roles)}
 		if role.Permissions == "" {
@@ -146,7 +146,7 @@ func (s *Server) guildRoutes() {
 		writeJSON(w, out)
 	}))
 	s.Handle("POST /v1/guilds/{guild}/channels", withGuild(func(w http.ResponseWriter, r *http.Request, g *fluxer.Guild) {
-		var body fluxer.ChannelCreate
+		var body fluxer.NewChannel
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		ch := fluxer.Channel{
 			ID: s.newID(), GuildID: g.ID, Name: body.Name, Type: body.Type, Topic: body.Topic,
@@ -233,7 +233,7 @@ func (s *Server) memberRoutes(withGuild func(func(http.ResponseWriter, *http.Req
 		writeJSON(w, out)
 	}))
 	s.Handle("PUT /v1/guilds/{guild}/bans/{user}", withGuild(func(w http.ResponseWriter, r *http.Request, g *fluxer.Guild) {
-		var body fluxer.BanCreate
+		var body fluxer.BanOptions
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		if s.gs.bans[g.ID] == nil {
 			s.gs.bans[g.ID] = map[string]fluxer.GuildBan{}

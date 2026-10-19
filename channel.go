@@ -109,7 +109,7 @@ type DefaultReaction struct {
 	EmojiName string `json:"emoji_name,omitempty"`
 }
 
-type ChannelCreate struct {
+type NewChannel struct {
 	Name                       string      `json:"name"`
 	Type                       int         `json:"type"`
 	Topic                      string      `json:"topic,omitempty"`
@@ -186,7 +186,7 @@ func (c *Client) GuildChannels(ctx context.Context, guildID string) ([]Channel, 
 	return chs, c.Do(ctx, http.MethodGet, guildPath(guildID)+"/channels", nil, &chs)
 }
 
-func (c *Client) CreateChannel(ctx context.Context, guildID string, ch ChannelCreate) (*Channel, error) {
+func (c *Client) CreateChannel(ctx context.Context, guildID string, ch NewChannel) (*Channel, error) {
 	var out Channel
 	return &out, c.Do(ctx, http.MethodPost, guildPath(guildID)+"/channels", ch, &out)
 }

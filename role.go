@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-type RoleCreate struct {
+type NewRole struct {
 	Name        string `json:"name"`
 	Color       int    `json:"color,omitempty"`
 	Permissions string `json:"permissions,omitempty"`
@@ -30,7 +30,7 @@ func (c *Client) Roles(ctx context.Context, guildID string) ([]Role, error) {
 	return roles, c.Do(ctx, http.MethodGet, guildPath(guildID)+"/roles", nil, &roles)
 }
 
-func (c *Client) CreateRole(ctx context.Context, guildID string, r RoleCreate) (*Role, error) {
+func (c *Client) CreateRole(ctx context.Context, guildID string, r NewRole) (*Role, error) {
 	var role Role
 	return &role, c.Do(ctx, http.MethodPost, guildPath(guildID)+"/roles", r, &role)
 }

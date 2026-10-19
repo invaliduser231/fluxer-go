@@ -24,7 +24,7 @@ type PostMessage struct {
 	Flags           int              `json:"flags,omitempty"`
 }
 
-type PostCreate struct {
+type NewPost struct {
 	Name                string      `json:"name"`
 	Message             PostMessage `json:"message"`
 	AppliedTags         []string    `json:"applied_tags,omitempty"`
@@ -70,11 +70,11 @@ type Post struct {
 	Message *Message `json:"message,omitempty"`
 }
 
-func (c *Client) CreatePost(ctx context.Context, forumID string, p PostCreate) (*Post, error) {
+func (c *Client) CreatePost(ctx context.Context, forumID string, p NewPost) (*Post, error) {
 	return c.CreatePostFiles(ctx, forumID, p, nil)
 }
 
-func (c *Client) CreatePostFiles(ctx context.Context, forumID string, p PostCreate, files []File) (*Post, error) {
+func (c *Client) CreatePostFiles(ctx context.Context, forumID string, p NewPost, files []File) (*Post, error) {
 	var post Post
 	return &post, c.DoFiles(ctx, http.MethodPost, channelPath(forumID)+"/threads", p, files, &post)
 }

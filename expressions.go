@@ -5,12 +5,12 @@ import (
 	"net/http"
 )
 
-type EmojiCreate struct {
+type NewEmoji struct {
 	Name  string `json:"name"`
 	Image string `json:"image"`
 }
 
-type StickerCreate struct {
+type NewSticker struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
@@ -28,7 +28,7 @@ func (c *Client) Emojis(ctx context.Context, guildID string) ([]Emoji, error) {
 	return es, c.Do(ctx, http.MethodGet, guildPath(guildID)+"/emojis", nil, &es)
 }
 
-func (c *Client) CreateEmoji(ctx context.Context, guildID string, e EmojiCreate) (*Emoji, error) {
+func (c *Client) CreateEmoji(ctx context.Context, guildID string, e NewEmoji) (*Emoji, error) {
 	var out Emoji
 	return &out, c.Do(ctx, http.MethodPost, guildPath(guildID)+"/emojis", e, &out)
 }
@@ -52,7 +52,7 @@ func (c *Client) Stickers(ctx context.Context, guildID string) ([]Sticker, error
 	return ss, c.Do(ctx, http.MethodGet, guildPath(guildID)+"/stickers", nil, &ss)
 }
 
-func (c *Client) CreateSticker(ctx context.Context, guildID string, s StickerCreate) (*Sticker, error) {
+func (c *Client) CreateSticker(ctx context.Context, guildID string, s NewSticker) (*Sticker, error) {
 	var out Sticker
 	return &out, c.Do(ctx, http.MethodPost, guildPath(guildID)+"/stickers", s, &out)
 }

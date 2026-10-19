@@ -14,7 +14,7 @@ type GuildBan struct {
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 }
 
-type BanCreate struct {
+type BanOptions struct {
 	DeleteMessageSeconds int    `json:"delete_message_seconds"`
 	BanDurationSeconds   int    `json:"ban_duration_seconds,omitempty"`
 	Reason               string `json:"reason,omitempty"`
@@ -25,7 +25,7 @@ func (c *Client) Bans(ctx context.Context, guildID string) ([]GuildBan, error) {
 	return bans, c.Do(ctx, http.MethodGet, guildPath(guildID)+"/bans", nil, &bans)
 }
 
-func (c *Client) Ban(ctx context.Context, guildID, userID string, b BanCreate) error {
+func (c *Client) Ban(ctx context.Context, guildID, userID string, b BanOptions) error {
 	return c.Do(ctx, http.MethodPut, guildPath(guildID)+"/bans/"+userID, b, nil)
 }
 

@@ -30,7 +30,7 @@ type Invite struct {
 
 func (i Invite) URL(base string) string { return base + "/" + i.Code }
 
-type InviteCreate struct {
+type NewInvite struct {
 	MaxUses   int  `json:"max_uses,omitempty"`
 	MaxAge    *int `json:"max_age,omitempty"`
 	Unique    bool `json:"unique,omitempty"`
@@ -46,7 +46,7 @@ func (c *Client) DeleteInvite(ctx context.Context, code string) error {
 	return c.Do(ctx, http.MethodDelete, "/invites/"+url.PathEscape(code), nil, nil)
 }
 
-func (c *Client) CreateInvite(ctx context.Context, channelID string, i InviteCreate) (*Invite, error) {
+func (c *Client) CreateInvite(ctx context.Context, channelID string, i NewInvite) (*Invite, error) {
 	var inv Invite
 	return &inv, c.Do(ctx, http.MethodPost, channelPath(channelID)+"/invites", i, &inv)
 }
