@@ -23,6 +23,13 @@ type Stats struct {
 	Overlaps   int
 	Ignored    []string
 	Identified []time.Time
+	Identify   json.RawMessage
+	Commands   []Command
+}
+
+type Command struct {
+	Op int
+	D  json.RawMessage
 }
 
 type session struct {
@@ -178,12 +185,14 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 			s.mu.Lock()
 			attached := c.sess != nil
 			s.mu.Unlock()
-			if attached {
-				ws.Close(4001, "Unknown opcode")
-			} else {
+			if !attached {
 				ws.Close(4003, "Not authenticated")
+				return
 			}
-			return
+			if !s.command(c, p.Op, p.D) {
+				ws.Close(4001, "Unknown opcode")
+				return
+			}
 		}
 	}
 }
@@ -204,6 +213,7 @@ func (s *Server) identify(c *conn, d json.RawMessage) bool {
 	s.gw.stats.Identifies++
 	s.gw.stats.Identified = append(s.gw.stats.Identified, time.Now())
 	s.gw.stats.Ignored = id.IgnoredEvents
+	s.gw.stats.Identify = append(json.RawMessage(nil), d...)
 	s.gw.nextSess++
 	sess := &session{id: "session-" + strconv.Itoa(s.gw.nextSess), seq: 1, conn: c, ignored: id.IgnoredEvents}
 	s.gw.sessions[sess.id] = sess
