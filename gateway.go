@@ -233,9 +233,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 			s.mu.Unlock()
 			switch p.T {
 			case "READY":
-				var r struct {
-					SessionID string `json:"session_id"`
-				}
+				var r Ready
 				if err := json.Unmarshal(p.D, &r); err != nil {
 					return false, err
 				}

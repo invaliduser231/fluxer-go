@@ -1,0 +1,68 @@
+package fluxer_test
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/invaliduser231/fluxer-go"
+)
+
+func TestDecodeMessageCreate(t *testing.T) {
+	raw := `{"id":"5","channel_id":"2","guild_id":"3","channel_type":0,"author":{"id":"7","username":"anna","discriminator":"0420","global_name":"Anna","avatar":null,"flags":0},
+		"member":{"roles":["40"],"joined_at":"2026-01-02T03:04:05Z","mute":false,"deaf":false},"type":0,"flags":0,"content":"!ping","timestamp":"2026-10-01T10:00:00.123Z",
+		"pinned":false,"mention_everyone":false,"tts":false,"mentions":[],"mention_roles":[],"mention_here":true}`
+	e, err := fluxer.Decode("MESSAGE_CREATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := e.(*fluxer.MessageCreate)
+	if !ok || m.Content != "!ping" || m.Author.DisplayName() != "Anna" || m.Member.Roles[0] != "40" || !m.MentionHere || m.Timestamp.IsZero() {
+		t.Errorf("got %#v", e)
+	}
+	if m.EventName() != "MESSAGE_CREATE" {
+		t.Errorf("name %s", m.EventName())
+	}
+}
+
+func TestDecodeGuildCreate(t *testing.T) {
+	raw := `{"id":"3","properties":{"id":"3","name":"Test","owner_id":"1","features":["DISCOVERABLE"]},
+		"roles":[{"id":"3","name":"@everyone","color":0,"position":0,"permissions":"1024","hoist":false,"mentionable":false}],
+		"channels":[{"id":"30","type":0,"name":"general"}],"emojis":[],"stickers":[],"members":[{"user":{"id":"1000"},"roles":[]}],
+		"member_count":12,"online_count":4,"presences":[],"voice_states":[{"guild_id":"3","channel_id":"31","user_id":"7","connection_id":"c1","mute":false,"deaf":false,"self_mute":true,"self_deaf":false,"self_video":false,"self_stream":false,"is_mobile":false,"suppress":false,"version":3}],
+		"joined_at":"2026-09-30T19:03:21Z","unavailable":false}`
+	e, err := fluxer.Decode("GUILD_CREATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := e.(*fluxer.GuildCreate)
+	full := g.Guild()
+	if full.ID != "3" || full.Name != "Test" || len(full.Roles) != 1 || full.MemberCount != 12 || !full.HasFeature("DISCOVERABLE") {
+		t.Errorf("got %+v", full)
+	}
+	if len(g.VoiceStates) != 1 || !g.VoiceStates[0].SelfMute || g.VoiceStates[0].ConnectionID != "c1" {
+		t.Errorf("got %+v", g.VoiceStates)
+	}
+}
+
+func TestDecodeReactionEmoji(t *testing.T) {
+	e, err := fluxer.Decode("MESSAGE_REACTION_ADD", json.RawMessage(`{"user_id":"7","channel_id":"2","message_id":"5","emoji":{"name":"coin","id":"123","animated":true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := e.(*fluxer.MessageReactionAdd)
+	if r.Emoji.String() != "<:coin:123>" || r.Emoji.APIName() != "coin:123" || r.Emoji.Animated == nil || !*r.Emoji.Animated {
+		t.Errorf("got %+v", r.Emoji)
+	}
+}
+
+func TestDecodeUnknownAndEmpty(t *testing.T) {
+	if e, err := fluxer.Decode("SOMETHING_NEW", json.RawMessage(`{}`)); e != nil || err != nil {
+		t.Errorf("got %v, %v", e, err)
+	}
+	if e, err := fluxer.Decode("RESUMED", nil); err != nil || e.EventName() != "RESUMED" {
+		t.Errorf("got %v, %v", e, err)
+	}
+	if _, err := fluxer.Decode("MESSAGE_DELETE", json.RawMessage(`{"id":5}`)); err == nil {
+		t.Error("expected error for a numeric id")
+	}
+}
