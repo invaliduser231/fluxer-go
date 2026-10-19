@@ -35,6 +35,7 @@ const (
 
 var (
 	ErrInvalidToken = errors.New("fluxer: invalid token")
+	ErrNotConnected = errors.New("fluxer: gateway is not connected")
 	errReconnect    = errors.New("fluxer: server requested reconnect")
 	errZombie       = errors.New("fluxer: heartbeat not acknowledged")
 	errNoReady      = errors.New("fluxer: no ready before timeout")
@@ -64,6 +65,7 @@ type Session struct {
 	Token         string
 	Shard         Shard
 	Flags         int
+	Presence      *StatusUpdate
 	IgnoredEvents []string
 	Handler       func(event string, data json.RawMessage)
 	Logger        *slog.Logger
@@ -79,6 +81,7 @@ type Session struct {
 	sessionID string
 	seq       int64
 	latency   time.Duration
+	live      *websocket.Conn
 	writeMu   sync.Mutex
 }
 
@@ -170,6 +173,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 		_ = conn.Close(statusResumable, "")
 	})
 	defer func() {
+		s.setLive(nil)
 		cancel()
 		<-closed
 		abort()
@@ -242,9 +246,11 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 				s.mu.Unlock()
 				ready = true
 				signal(true)
+				s.setLive(conn)
 			case "RESUMED":
 				ready = true
 				signal(true)
+				s.setLive(conn)
 			}
 			if s.Handler != nil {
 				s.Handler(p.T, p.D)
@@ -262,6 +268,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 		case opReconnect:
 			return ready, errReconnect
 		case opInvalidSession:
+			s.setLive(nil)
 			s.Restore(Checkpoint{})
 			if err := sleep(ctx, s.minBackoff()); err != nil {
 				return ready, err
@@ -329,6 +336,9 @@ func (s *Session) identify(ctx context.Context, conn *websocket.Conn) error {
 	}
 	if s.Shard.Count > 0 {
 		d["shard"] = []int{s.Shard.ID, s.Shard.Count}
+	}
+	if s.Presence != nil {
+		d["presence"] = s.Presence
 	}
 	return s.send(ctx, conn, opIdentify, d)
 }
