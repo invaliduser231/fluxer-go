@@ -55,6 +55,19 @@ func TestDecodeReactionEmoji(t *testing.T) {
 	}
 }
 
+func TestDecodeAuditLogEntry(t *testing.T) {
+	raw := `{"guild_id":"3","id":"77","action_type":22,"user_id":"1","target_id":"7","reason":"spam","options":{"delete_message_seconds":3600},
+		"changes":[{"key":"nick","old_value":"a","new_value":null}]}`
+	e, err := fluxer.Decode("GUILD_AUDIT_LOG_ENTRY_CREATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := e.(*fluxer.GuildAuditLogEntryCreate)
+	if a.GuildID != "3" || a.ActionType != fluxer.AuditMemberBanAdd || a.Options["delete_message_seconds"] != 3600.0 || string(a.Changes[0].OldValue) != `"a"` {
+		t.Errorf("got %+v", a)
+	}
+}
+
 func TestDecodeUnknownAndEmpty(t *testing.T) {
 	if e, err := fluxer.Decode("SOMETHING_NEW", json.RawMessage(`{}`)); e != nil || err != nil {
 		t.Errorf("got %v, %v", e, err)
