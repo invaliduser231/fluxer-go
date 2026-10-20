@@ -149,6 +149,25 @@ func (s *Server) messageRoutes() {
 	}
 	s.Handle("PUT /v1/channels/{channel}/pins/{message}", pin(true))
 	s.Handle("DELETE /v1/channels/{channel}/pins/{message}", pin(false))
+	s.Handle("POST /v1/search/messages", func(w http.ResponseWriter, r *http.Request) {
+		var q fluxer.MessageSearch
+		_ = json.NewDecoder(r.Body).Decode(&q)
+		s.mu.Lock()
+		res := fluxer.MessageSearchResult{Messages: []fluxer.Message{}, Channels: []fluxer.Channel{}, HitsPerPage: 25, Page: 1}
+		for ch, msgs := range s.messages {
+			if len(q.ChannelIDs) > 0 && !slices.Contains(q.ChannelIDs, ch) {
+				continue
+			}
+			for _, m := range msgs {
+				if strings.Contains(strings.ToLower(m.Content), strings.ToLower(q.Content)) {
+					res.Messages = append(res.Messages, m)
+				}
+			}
+		}
+		s.mu.Unlock()
+		res.Total = len(res.Messages)
+		writeJSON(w, res)
+	})
 	s.Handle("POST /v1/channels/{channel}/typing", noContent)
 	s.Handle("PUT /v1/channels/{channel}/messages/{message}/reactions/{emoji}/@me", noContent)
 	s.Handle("DELETE /v1/channels/{channel}/messages/{message}/reactions/{emoji}/@me", noContent)
