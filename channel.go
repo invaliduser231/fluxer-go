@@ -73,10 +73,10 @@ func (c Channel) IsPrivate() bool {
 func (c Channel) Mention() string { return "<#" + c.ID + ">" }
 
 type Overwrite struct {
-	ID    string `json:"id"`
-	Type  int    `json:"type"`
-	Allow string `json:"allow"`
-	Deny  string `json:"deny"`
+	ID    string      `json:"id"`
+	Type  int         `json:"type"`
+	Allow Permissions `json:"allow"`
+	Deny  Permissions `json:"deny"`
 }
 
 type ThreadMetadata struct {

@@ -10,35 +10,35 @@ import (
 )
 
 type Guild struct {
-	ID                          string    `json:"id"`
-	Name                        string    `json:"name"`
-	Icon                        string    `json:"icon,omitempty"`
-	Banner                      string    `json:"banner,omitempty"`
-	Splash                      string    `json:"splash,omitempty"`
-	VanityURLCode               string    `json:"vanity_url_code,omitempty"`
-	OwnerID                     string    `json:"owner_id"`
-	SystemChannelID             string    `json:"system_channel_id,omitempty"`
-	SystemChannelFlags          int       `json:"system_channel_flags,omitempty"`
-	RulesChannelID              string    `json:"rules_channel_id,omitempty"`
-	AFKChannelID                string    `json:"afk_channel_id,omitempty"`
-	AFKTimeout                  int       `json:"afk_timeout,omitempty"`
-	Features                    []string  `json:"features,omitempty"`
-	VerificationLevel           int       `json:"verification_level,omitempty"`
-	MFALevel                    int       `json:"mfa_level,omitempty"`
-	NSFWLevel                   int       `json:"nsfw_level,omitempty"`
-	NSFW                        bool      `json:"nsfw,omitempty"`
-	ExplicitContentFilter       int       `json:"explicit_content_filter,omitempty"`
-	DefaultMessageNotifications int       `json:"default_message_notifications,omitempty"`
-	DisabledOperations          int       `json:"disabled_operations,omitempty"`
-	Permissions                 string    `json:"permissions,omitempty"`
-	Roles                       []Role    `json:"roles,omitempty"`
-	Emojis                      []Emoji   `json:"emojis,omitempty"`
-	Stickers                    []Sticker `json:"stickers,omitempty"`
-	Channels                    []Channel `json:"channels,omitempty"`
-	MemberCount                 int       `json:"member_count,omitempty"`
-	OnlineCount                 int       `json:"online_count,omitempty"`
-	ApproximateMemberCount      int       `json:"approximate_member_count,omitempty"`
-	ApproximatePresenceCount    int       `json:"approximate_presence_count,omitempty"`
+	ID                          string      `json:"id"`
+	Name                        string      `json:"name"`
+	Icon                        string      `json:"icon,omitempty"`
+	Banner                      string      `json:"banner,omitempty"`
+	Splash                      string      `json:"splash,omitempty"`
+	VanityURLCode               string      `json:"vanity_url_code,omitempty"`
+	OwnerID                     string      `json:"owner_id"`
+	SystemChannelID             string      `json:"system_channel_id,omitempty"`
+	SystemChannelFlags          int         `json:"system_channel_flags,omitempty"`
+	RulesChannelID              string      `json:"rules_channel_id,omitempty"`
+	AFKChannelID                string      `json:"afk_channel_id,omitempty"`
+	AFKTimeout                  int         `json:"afk_timeout,omitempty"`
+	Features                    []string    `json:"features,omitempty"`
+	VerificationLevel           int         `json:"verification_level,omitempty"`
+	MFALevel                    int         `json:"mfa_level,omitempty"`
+	NSFWLevel                   int         `json:"nsfw_level,omitempty"`
+	NSFW                        bool        `json:"nsfw,omitempty"`
+	ExplicitContentFilter       int         `json:"explicit_content_filter,omitempty"`
+	DefaultMessageNotifications int         `json:"default_message_notifications,omitempty"`
+	DisabledOperations          int         `json:"disabled_operations,omitempty"`
+	Permissions                 Permissions `json:"permissions,omitempty"`
+	Roles                       []Role      `json:"roles,omitempty"`
+	Emojis                      []Emoji     `json:"emojis,omitempty"`
+	Stickers                    []Sticker   `json:"stickers,omitempty"`
+	Channels                    []Channel   `json:"channels,omitempty"`
+	MemberCount                 int         `json:"member_count,omitempty"`
+	OnlineCount                 int         `json:"online_count,omitempty"`
+	ApproximateMemberCount      int         `json:"approximate_member_count,omitempty"`
+	ApproximatePresenceCount    int         `json:"approximate_presence_count,omitempty"`
 }
 
 func (g Guild) HasFeature(feature string) bool { return slices.Contains(g.Features, feature) }
@@ -53,15 +53,15 @@ func IconURL(media, guildID, hash string) string {
 }
 
 type Role struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Color         int    `json:"color,omitempty"`
-	Position      int    `json:"position"`
-	HoistPosition *int   `json:"hoist_position,omitempty"`
-	Permissions   string `json:"permissions"`
-	Hoist         bool   `json:"hoist,omitempty"`
-	Mentionable   bool   `json:"mentionable,omitempty"`
-	UnicodeEmoji  string `json:"unicode_emoji,omitempty"`
+	ID            string      `json:"id"`
+	Name          string      `json:"name"`
+	Color         int         `json:"color,omitempty"`
+	Position      int         `json:"position"`
+	HoistPosition *int        `json:"hoist_position,omitempty"`
+	Permissions   Permissions `json:"permissions"`
+	Hoist         bool        `json:"hoist,omitempty"`
+	Mentionable   bool        `json:"mentionable,omitempty"`
+	UnicodeEmoji  string      `json:"unicode_emoji,omitempty"`
 }
 
 func (r Role) Mention() string { return "<@&" + r.ID + ">" }

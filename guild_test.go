@@ -16,7 +16,7 @@ func guildSetup(t *testing.T) (*fluxertest.Server, *fluxer.Client) {
 	srv, c := setup(t)
 	srv.AddGuild(fluxer.Guild{
 		ID: "3", Name: "Test", OwnerID: "1",
-		Roles:    []fluxer.Role{{ID: "3", Name: "@everyone", Permissions: "0"}},
+		Roles:    []fluxer.Role{{ID: "3", Name: "@everyone", Permissions: 0}},
 		Channels: []fluxer.Channel{{ID: "30", Name: "general", Type: fluxer.ChannelText}},
 	})
 	srv.AddMember("3", fluxer.Member{User: &fluxer.User{ID: "1000", Username: "testbot"}})

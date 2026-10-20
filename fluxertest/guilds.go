@@ -99,9 +99,6 @@ func (s *Server) guildRoutes() {
 		var body fluxer.NewRole
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		role := fluxer.Role{ID: s.newID(), Name: body.Name, Color: body.Color, Permissions: body.Permissions, Position: len(g.Roles)}
-		if role.Permissions == "" {
-			role.Permissions = "0"
-		}
 		g.Roles = append(g.Roles, role)
 		writeJSON(w, role)
 	}))

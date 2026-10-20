@@ -6,18 +6,18 @@ import (
 )
 
 type NewRole struct {
-	Name        string `json:"name"`
-	Color       int    `json:"color,omitempty"`
-	Permissions string `json:"permissions,omitempty"`
+	Name        string      `json:"name"`
+	Color       int         `json:"color,omitempty"`
+	Permissions Permissions `json:"permissions,omitempty"`
 }
 
 type RoleEdit struct {
-	Name          *string `json:"name,omitempty"`
-	Color         *int    `json:"color,omitempty"`
-	Permissions   *string `json:"permissions,omitempty"`
-	Hoist         *bool   `json:"hoist,omitempty"`
-	HoistPosition *int    `json:"hoist_position,omitempty"`
-	Mentionable   *bool   `json:"mentionable,omitempty"`
+	Name          *string      `json:"name,omitempty"`
+	Color         *int         `json:"color,omitempty"`
+	Permissions   *Permissions `json:"permissions,omitempty"`
+	Hoist         *bool        `json:"hoist,omitempty"`
+	HoistPosition *int         `json:"hoist_position,omitempty"`
+	Mentionable   *bool        `json:"mentionable,omitempty"`
 }
 
 type RolePosition struct {
