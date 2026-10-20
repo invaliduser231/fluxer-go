@@ -211,6 +211,7 @@ func (s *Server) identify(c *conn, d json.RawMessage) bool {
 		return false
 	}
 	s.gw.stats.Identifies++
+	s.gw.rejectResume = false
 	s.gw.stats.Identified = append(s.gw.stats.Identified, time.Now())
 	s.gw.stats.Ignored = id.IgnoredEvents
 	s.gw.stats.Identify = append(json.RawMessage(nil), d...)
@@ -236,7 +237,6 @@ func (s *Server) resume(c *conn, d json.RawMessage) bool {
 	s.mu.Lock()
 	s.gw.stats.Resumes++
 	if r.Token != s.Token || s.gw.rejectResume {
-		s.gw.rejectResume = false
 		s.mu.Unlock()
 		return false
 	}
