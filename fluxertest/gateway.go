@@ -24,6 +24,7 @@ type Stats struct {
 	Ignored    []string
 	Identified []time.Time
 	Identify   json.RawMessage
+	Shards     [][]int
 	Commands   []Command
 }
 
@@ -109,6 +110,7 @@ func (s *Server) Stats() Stats {
 	st := s.gw.stats
 	st.Ignored = append([]string(nil), st.Ignored...)
 	st.Identified = append([]time.Time(nil), st.Identified...)
+	st.Shards = append([][]int(nil), st.Shards...)
 	return st
 }
 
@@ -201,6 +203,7 @@ func (s *Server) identify(c *conn, d json.RawMessage) bool {
 	var id struct {
 		Token         string   `json:"token"`
 		IgnoredEvents []string `json:"ignored_events"`
+		Shard         []int    `json:"shard"`
 	}
 	if json.Unmarshal(d, &id) != nil {
 		return false
@@ -215,6 +218,9 @@ func (s *Server) identify(c *conn, d json.RawMessage) bool {
 	s.gw.stats.Identified = append(s.gw.stats.Identified, time.Now())
 	s.gw.stats.Ignored = id.IgnoredEvents
 	s.gw.stats.Identify = append(json.RawMessage(nil), d...)
+	if id.Shard != nil {
+		s.gw.stats.Shards = append(s.gw.stats.Shards, id.Shard)
+	}
 	s.gw.nextSess++
 	sess := &session{id: "session-" + strconv.Itoa(s.gw.nextSess), seq: 1, conn: c, ignored: id.IgnoredEvents}
 	s.gw.sessions[sess.id] = sess
