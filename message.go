@@ -147,6 +147,7 @@ type MessageSend struct {
 	MessageReference *MessageReference `json:"message_reference,omitempty"`
 	AllowedMentions  *AllowedMentions  `json:"allowed_mentions,omitempty"`
 	StickerIDs       []string          `json:"sticker_ids,omitempty"`
+	Attachments      []UploadedFile    `json:"attachments,omitempty"`
 	Flags            int               `json:"flags,omitempty"`
 	TTS              bool              `json:"tts,omitempty"`
 	Nonce            string            `json:"nonce,omitempty"`
