@@ -1,10 +1,6 @@
 package fluxer
 
-import (
-	"context"
-
-	"github.com/coder/websocket"
-)
+import "context"
 
 const (
 	opPresenceUpdate             = 3
@@ -53,7 +49,7 @@ type GuildSubscription struct {
 	Members            []string            `json:"members,omitempty"`
 }
 
-func (s *Session) setLive(conn *websocket.Conn) {
+func (s *Session) setLive(conn *wire) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.live = conn

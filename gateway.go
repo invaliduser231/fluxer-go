@@ -81,8 +81,7 @@ type Session struct {
 	sessionID string
 	seq       int64
 	latency   time.Duration
-	live      *websocket.Conn
-	writeMu   sync.Mutex
+	live      *wire
 }
 
 type payload struct {
@@ -152,7 +151,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	conn, resp, err := websocket.Dial(parent, u, &websocket.DialOptions{HTTPClient: s.HTTP})
+	ws, resp, err := websocket.Dial(parent, u, &websocket.DialOptions{HTTPClient: s.HTTP})
 	if err != nil {
 		s.observe("connect_failed")
 		if b := banned(resp); b != nil {
@@ -161,7 +160,8 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 		return false, err
 	}
 	s.observe("connect")
-	conn.SetReadLimit(cmp.Or(s.ReadLimit, 32<<20))
+	ws.SetReadLimit(cmp.Or(s.ReadLimit, 32<<20))
+	conn := &wire{ws: ws}
 
 	ctx, cancel := context.WithCancel(parent)
 	rctx, abort := context.WithCancel(context.WithoutCancel(parent))
@@ -170,7 +170,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 		defer close(closed)
 		t := time.AfterFunc(closeTimeout, abort)
 		defer t.Stop()
-		_ = conn.Close(statusResumable, "")
+		_ = ws.Close(statusResumable, "")
 	})
 	defer func() {
 		s.setLive(nil)
@@ -282,7 +282,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 	}
 }
 
-func (s *Session) watchReady(ctx context.Context, conn *websocket.Conn, cancel func(), events <-chan bool) {
+func (s *Session) watchReady(ctx context.Context, conn *wire, cancel func(), events <-chan bool) {
 	t := time.NewTimer(s.readyTimeout())
 	defer t.Stop()
 	waiting, resent := true, false
@@ -308,7 +308,7 @@ func (s *Session) watchReady(ctx context.Context, conn *websocket.Conn, cancel f
 	}
 }
 
-func (s *Session) authenticate(ctx context.Context, conn *websocket.Conn) error {
+func (s *Session) authenticate(ctx context.Context, conn *wire) error {
 	c := s.Checkpoint()
 	if c.SessionID == "" {
 		return s.identify(ctx, conn)
@@ -317,7 +317,7 @@ func (s *Session) authenticate(ctx context.Context, conn *websocket.Conn) error 
 	return s.send(ctx, conn, opResume, map[string]any{"token": s.Token, "session_id": c.SessionID, "seq": c.Seq})
 }
 
-func (s *Session) identify(ctx context.Context, conn *websocket.Conn) error {
+func (s *Session) identify(ctx context.Context, conn *wire) error {
 	if s.Pacer != nil {
 		if err := s.Pacer.Wait(ctx); err != nil {
 			return err
@@ -343,7 +343,7 @@ func (s *Session) identify(ctx context.Context, conn *websocket.Conn) error {
 	return s.send(ctx, conn, opIdentify, d)
 }
 
-func (s *Session) send(ctx context.Context, conn *websocket.Conn, op int, d any) error {
+func (s *Session) send(ctx context.Context, conn *wire, op int, d any) error {
 	data, err := json.Marshal(struct {
 		Op int `json:"op"`
 		D  any `json:"d"`
@@ -351,28 +351,11 @@ func (s *Session) send(ctx context.Context, conn *websocket.Conn, op int, d any)
 	if err != nil {
 		return err
 	}
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return conn.Write(context.WithoutCancel(ctx), websocket.MessageText, data)
+	return conn.write(ctx, data)
 }
 
-func (s *Session) read(ctx context.Context, conn *websocket.Conn) (payload, error) {
-	typ, data, err := conn.Read(ctx)
-	if err != nil {
-		var ce websocket.CloseError
-		if errors.As(err, &ce) {
-			return payload{}, &CloseError{Code: int(ce.Code), Reason: ce.Reason}
-		}
-		return payload{}, err
-	}
-	if typ != websocket.MessageText {
-		return payload{}, errors.New("fluxer: unexpected binary frame")
-	}
-	var p payload
-	return p, json.Unmarshal(data, &p)
+func (s *Session) read(ctx context.Context, conn *wire) (payload, error) {
+	return conn.read(ctx)
 }
 
 type beat struct {
@@ -398,7 +381,7 @@ func (b *beat) ack() time.Duration {
 	return max(time.Since(b.sentAt), time.Microsecond)
 }
 
-func (s *Session) heartbeat(ctx context.Context, conn *websocket.Conn, interval time.Duration, b *beat) error {
+func (s *Session) heartbeat(ctx context.Context, conn *wire, interval time.Duration, b *beat) error {
 	t := time.NewTimer(rand.N(interval))
 	defer t.Stop()
 	late := false
@@ -427,7 +410,7 @@ func (s *Session) heartbeat(ctx context.Context, conn *websocket.Conn, interval 
 	}
 }
 
-func (s *Session) sendHeartbeat(ctx context.Context, conn *websocket.Conn, b *beat) error {
+func (s *Session) sendHeartbeat(ctx context.Context, conn *wire, b *beat) error {
 	var d any
 	if seq := s.Checkpoint().Seq; seq > 0 {
 		d = seq
