@@ -1,12 +1,10 @@
 package fluxertest
 
 import (
-	"context"
 	"encoding/json"
 	"slices"
 	"strings"
 
-	"github.com/coder/websocket"
 	"github.com/invaliduser231/fluxer-go"
 )
 
@@ -75,12 +73,9 @@ func (s *Server) dispatchTo(sess *session, event string, data any) {
 	sess.buffer = append(sess.buffer, frame{seq: sess.seq, data: f})
 	c := sess.conn
 	s.mu.Unlock()
-	if c == nil {
-		return
+	if c != nil {
+		c.write(f)
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	_ = c.ws.Write(context.Background(), websocket.MessageText, f)
 }
 
 func (s *Server) Commands(op int) []json.RawMessage {

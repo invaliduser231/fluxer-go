@@ -1,8 +1,10 @@
 package fluxertest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/klauspost/compress/zstd"
 )
 
 const dropNoticed = 100 * time.Millisecond
@@ -25,6 +28,7 @@ type Stats struct {
 	Identified []time.Time
 	Identify   json.RawMessage
 	Shards     [][]int
+	Compressed int
 	Commands   []Command
 }
 
@@ -51,15 +55,60 @@ type conn struct {
 	mu    sync.Mutex
 	sess  *session
 	token string
+	zw    *zstd.Encoder
+	zbuf  bytes.Buffer
 }
 
 func (c *conn) send(v any) {
 	data, _ := json.Marshal(v)
+	c.write(data)
+}
+
+func (c *conn) write(data []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = c.ws.Write(ctx, websocket.MessageText, data)
+	if c.zw == nil {
+		_ = c.ws.Write(ctx, websocket.MessageText, data)
+		return
+	}
+	c.zbuf.Reset()
+	_, _ = c.zw.Write(data)
+	_ = c.zw.Flush()
+	_ = c.ws.Write(ctx, websocket.MessageBinary, c.zbuf.Bytes())
+}
+
+func (c *conn) reader(ctx context.Context) func() ([]byte, error) {
+	if c.zw == nil {
+		return func() ([]byte, error) {
+			_, data, err := c.ws.Read(ctx)
+			return data, err
+		}
+	}
+	pr, pw := io.Pipe()
+	go func() {
+		for {
+			_, data, err := c.ws.Read(ctx)
+			if err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+			if _, err := pw.Write(data); err != nil {
+				return
+			}
+		}
+	}()
+	zr, _ := zstd.NewReader(pr, zstd.WithDecoderConcurrency(1))
+	dec := json.NewDecoder(zr)
+	return func() ([]byte, error) {
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			zr.Close()
+			return nil, err
+		}
+		return raw, nil
+	}
 }
 
 type gatewayState struct {
@@ -133,6 +182,12 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := &conn{ws: ws}
+	if q := r.URL.Query(); q.Get("compress") == "zstd-stream" && (q.Get("stream") == "1" || q.Get("stream") == "true") {
+		c.zw, _ = zstd.NewWriter(&c.zbuf, zstd.WithEncoderConcurrency(1))
+		s.mu.Lock()
+		s.gw.stats.Compressed++
+		s.mu.Unlock()
+	}
 	s.mu.Lock()
 	s.gw.conns[c] = true
 	interval := s.gw.interval
@@ -140,8 +195,9 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 	defer s.detach(c)
 
 	c.send(map[string]any{"op": 10, "d": map[string]any{"heartbeat_interval": interval.Milliseconds()}})
+	next := c.reader(r.Context())
 	for {
-		_, data, err := ws.Read(r.Context())
+		data, err := next()
 		if err != nil {
 			if websocket.CloseStatus(err) == -1 {
 				time.Sleep(dropNoticed)
@@ -263,9 +319,7 @@ func (s *Server) resume(c *conn, d json.RawMessage) bool {
 	seq := sess.seq
 	s.mu.Unlock()
 	for _, data := range replay {
-		c.mu.Lock()
-		_ = c.ws.Write(context.Background(), websocket.MessageText, data)
-		c.mu.Unlock()
+		c.write(data)
 	}
 	c.send(map[string]any{"op": 0, "s": seq, "t": "RESUMED", "d": map[string]any{}})
 	return true
@@ -309,9 +363,7 @@ func (s *Server) Dispatch(event string, data any) {
 	}
 	s.mu.Unlock()
 	for i, c := range targets {
-		c.mu.Lock()
-		_ = c.ws.Write(context.Background(), websocket.MessageText, frames[i])
-		c.mu.Unlock()
+		c.write(frames[i])
 	}
 }
 

@@ -65,6 +65,7 @@ type Session struct {
 	Token         string
 	Shard         Shard
 	Flags         int
+	Compress      bool
 	Presence      *StatusUpdate
 	IgnoredEvents []string
 	Handler       func(event string, data json.RawMessage)
@@ -147,7 +148,7 @@ func (s *Session) Run(ctx context.Context) error {
 }
 
 func (s *Session) connect(parent context.Context) (bool, error) {
-	u, err := gatewayURL(cmp.Or(s.URL, DefaultGateway))
+	u, err := gatewayURL(cmp.Or(s.URL, DefaultGateway), s.Compress)
 	if err != nil {
 		return false, err
 	}
@@ -161,7 +162,8 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 	}
 	s.observe("connect")
 	ws.SetReadLimit(cmp.Or(s.ReadLimit, 32<<20))
-	conn := &wire{ws: ws}
+	conn := &wire{ws: ws, compress: s.Compress}
+	defer conn.close()
 
 	ctx, cancel := context.WithCancel(parent)
 	rctx, abort := context.WithCancel(context.WithoutCancel(parent))
@@ -421,7 +423,7 @@ func (s *Session) sendHeartbeat(ctx context.Context, conn *wire, b *beat) error 
 	return s.send(ctx, conn, opHeartbeat, d)
 }
 
-func gatewayURL(base string) (string, error) {
+func gatewayURL(base string, compress bool) (string, error) {
 	u, err := url.Parse(base)
 	if err != nil {
 		return "", err
@@ -432,6 +434,10 @@ func gatewayURL(base string) (string, error) {
 	q := u.Query()
 	q.Set("v", "1")
 	q.Set("encoding", "json")
+	if compress {
+		q.Set("compress", "zstd-stream")
+		q.Set("stream", "1")
+	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
