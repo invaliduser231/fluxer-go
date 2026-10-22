@@ -26,6 +26,7 @@ type Cache struct {
 	messageTTL    time.Duration
 	onEvict       func(fluxer.Message)
 	locks         [lockStripes]sync.Mutex
+	listeners     listeners
 
 	selfMu sync.RWMutex
 	self   fluxer.User
@@ -144,8 +145,17 @@ func eventGuild(e fluxer.Event) string {
 }
 
 func (c *Cache) Apply(e fluxer.Event) {
-	defer c.lock(eventGuild(e))()
+	unlock := c.lock(eventGuild(e))
+	var old any
+	notify := c.hasListeners()
+	if notify {
+		old = c.before(e)
+	}
 	c.apply(e)
+	unlock()
+	if notify {
+		c.notify(Change{Event: e, Old: old})
+	}
 }
 
 func (c *Cache) apply(e fluxer.Event) {
