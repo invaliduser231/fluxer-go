@@ -27,6 +27,7 @@ type Cache struct {
 	onEvict       func(fluxer.Message)
 	locks         [lockStripes]sync.Mutex
 	listeners     listeners
+	ready         readyState
 
 	selfMu sync.RWMutex
 	self   fluxer.User
@@ -170,6 +171,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		for _, ch := range e.PrivateChannels {
 			c.putChannel(ch)
 		}
+		c.ready.start(e.Guilds)
 		for _, g := range e.Guilds {
 			rec, _ := s.Guilds().Get("", g.ID)
 			rec.Guild.ID, rec.Unavailable = g.ID, g.Unavailable
@@ -184,6 +186,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		c.putUser(e.User)
 	case *fluxer.GuildCreate:
 		c.putGuild(e.GuildState)
+		c.ready.resolve(e.ID)
 	case *fluxer.GuildSync:
 		c.putGuild(e.GuildState)
 	case *fluxer.GuildUpdate:
@@ -199,6 +202,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		rec.Guild = info
 		c.putRecord(e.ID, rec)
 	case *fluxer.GuildDelete:
+		c.ready.resolve(e.ID)
 		if e.Unavailable {
 			rec := c.record(e.ID)
 			rec.Unavailable = true
