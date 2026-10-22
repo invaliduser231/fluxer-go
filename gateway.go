@@ -26,6 +26,7 @@ const (
 	opInvalidSession = 9
 	opHello          = 10
 	opHeartbeatACK   = 11
+	opGatewayError   = 12
 )
 
 const (
@@ -266,6 +267,10 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 				s.mu.Lock()
 				s.latency = d
 				s.mu.Unlock()
+			}
+		case opGatewayError:
+			if s.Handler != nil {
+				s.Handler("GATEWAY_ERROR", p.D)
 			}
 		case opReconnect:
 			return ready, errReconnect
