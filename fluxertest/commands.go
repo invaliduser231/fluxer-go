@@ -1,8 +1,10 @@
 package fluxertest
 
 import (
+	"cmp"
 	"encoding/json"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/invaliduser231/fluxer-go"
@@ -14,6 +16,8 @@ func (s *Server) command(c *conn, op int, d json.RawMessage) bool {
 	sess := c.sess
 	s.mu.Unlock()
 	switch op {
+	case 4:
+		s.voiceCommand(c, sess, d)
 	case 3, 14:
 	case 8:
 		var r fluxer.RequestMembers
@@ -88,4 +92,87 @@ func (s *Server) Commands(op int) []json.RawMessage {
 		}
 	}
 	return out
+}
+
+type voiceState struct {
+	endpoint string
+	refuse   string
+	states   map[string]fluxer.VoiceState
+	next     int
+}
+
+func (s *Server) SetVoiceEndpoint(url string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.vs.endpoint = url
+}
+
+func (s *Server) RefuseNextVoice(code string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.vs.refuse = code
+}
+
+func (s *Server) VoiceStates() []fluxer.VoiceState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []fluxer.VoiceState{}
+	for _, v := range s.vs.states {
+		out = append(out, v)
+	}
+	slices.SortFunc(out, func(a, b fluxer.VoiceState) int { return strings.Compare(a.ConnectionID, b.ConnectionID) })
+	return out
+}
+
+func (s *Server) voiceCommand(c *conn, sess *session, d json.RawMessage) {
+	var cmd struct {
+		GuildID      *string `json:"guild_id"`
+		ChannelID    *string `json:"channel_id"`
+		ConnectionID *string `json:"connection_id"`
+		SelfMute     bool    `json:"self_mute"`
+		SelfDeaf     bool    `json:"self_deaf"`
+	}
+	_ = json.Unmarshal(d, &cmd)
+	s.mu.Lock()
+	if s.vs.states == nil {
+		s.vs.states = map[string]fluxer.VoiceState{}
+	}
+	if code := s.vs.refuse; code != "" {
+		s.vs.refuse = ""
+		s.mu.Unlock()
+		c.send(map[string]any{"op": 12, "d": map[string]string{"code": code, "message": "refused"}})
+		return
+	}
+	guild := deref(cmd.GuildID)
+	id := deref(cmd.ConnectionID)
+	if id == "" && cmd.ChannelID != nil {
+		s.vs.next++
+		id = "conn-" + strconv.Itoa(s.vs.next)
+	}
+	old := s.vs.states[id]
+	state := fluxer.VoiceState{
+		GuildID: guild, ChannelID: deref(cmd.ChannelID), UserID: s.User.ID, ConnectionID: id, SessionID: sess.id,
+		SelfMute: cmd.SelfMute, SelfDeaf: cmd.SelfDeaf, Version: old.Version + 1,
+	}
+	grant := state.ChannelID != "" && old.ChannelID != state.ChannelID
+	if state.ChannelID == "" {
+		delete(s.vs.states, id)
+	} else {
+		s.vs.states[id] = state
+	}
+	endpoint := cmp.Or(s.vs.endpoint, "wss://voice.fluxer.invalid")
+	s.mu.Unlock()
+	s.dispatchTo(sess, "VOICE_STATE_UPDATE", state)
+	if grant {
+		s.dispatchTo(sess, "VOICE_SERVER_UPDATE", fluxer.VoiceServerUpdate{
+			Token: "voice-token-" + id, Endpoint: endpoint, ConnectionID: id, ChannelID: state.ChannelID, GuildID: guild,
+		})
+	}
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

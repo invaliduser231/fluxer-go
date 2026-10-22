@@ -36,6 +36,7 @@ type Server struct {
 	messages map[string][]fluxer.Message
 	gw       gatewayState
 	gs       guildState
+	vs       voiceState
 	ban      map[string]any
 	delay    time.Duration
 }
