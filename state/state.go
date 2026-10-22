@@ -114,6 +114,10 @@ func eventGuild(e fluxer.Event) string {
 		return e.GuildID
 	case *fluxer.VoiceStateUpdate:
 		return e.GuildID
+	case *fluxer.PresenceUpdate:
+		return e.GuildID
+	case *fluxer.PresenceUpdateBulk:
+		return e.GuildID
 	}
 	return ""
 }
@@ -130,6 +134,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		c.selfMu.Lock()
 		c.self = e.User
 		c.selfMu.Unlock()
+		c.putUser(e.User)
 		for _, ch := range e.PrivateChannels {
 			c.putChannel(ch)
 		}
@@ -144,6 +149,7 @@ func (c *Cache) apply(e fluxer.Event) {
 			c.self = e.User
 		}
 		c.selfMu.Unlock()
+		c.putUser(e.User)
 	case *fluxer.GuildCreate:
 		c.putGuild(e.GuildState)
 	case *fluxer.GuildSync:
@@ -220,6 +226,12 @@ func (c *Cache) apply(e fluxer.Event) {
 			c.putChannel(ch)
 		}
 	case *fluxer.MessageCreate:
+		c.putUser(e.Author)
+		if e.Member != nil && e.GuildID != "" {
+			m := *e.Member
+			m.User = &e.Author
+			c.putMember(e.GuildID, m)
+		}
 		if ch, ok := c.channel(e.ChannelID); ok {
 			ch.LastMessageID = e.ID
 			c.putChannel(ch)
@@ -247,8 +259,24 @@ func (c *Cache) apply(e fluxer.Event) {
 		rec.Guild.MemberCount = max(rec.Guild.MemberCount-1, 0)
 		c.putRecord(e.GuildID, rec)
 	case *fluxer.GuildMembersChunk:
+		for _, p := range e.Presences {
+			c.putPresence(e.GuildID, p)
+		}
 		for _, m := range e.Members {
 			c.putMember(e.GuildID, m)
+		}
+	case *fluxer.PresenceUpdate:
+		c.putPresence(e.GuildID, e.Presence)
+	case *fluxer.PresenceUpdateBulk:
+		for _, p := range e.Presences {
+			c.putPresence(e.GuildID, p)
+		}
+	case *fluxer.GuildCountsUpdate:
+		for _, n := range e.Counts {
+			if rec, ok := s.Guilds().Get("", n.GuildID); ok {
+				rec.Guild.MemberCount, rec.Guild.OnlineCount = n.MemberCount, n.OnlineCount
+				c.putRecord(n.GuildID, rec)
+			}
 		}
 	case *fluxer.VoiceStateUpdate:
 		c.putVoice(e.GuildID, e.VoiceState)
@@ -276,6 +304,7 @@ func (c *Cache) dropGuild(id string) {
 	s.VoiceStates().DeleteGroup(id)
 	s.Emojis().DeleteGroup(id)
 	s.Stickers().DeleteGroup(id)
+	s.Presences().DeleteGroup(id)
 	s.Guilds().Delete("", id)
 }
 
@@ -379,6 +408,7 @@ func (c *Cache) putMember(guildID string, m fluxer.Member) {
 	if m.User == nil || guildID == "" {
 		return
 	}
+	c.putUser(*m.User)
 	if old, ok := c.store.Members().Get(guildID, m.User.ID); ok && old.User != nil && m.User.Username == "" {
 		m.User = old.User
 	}
@@ -524,11 +554,67 @@ func (c *Cache) Role(guildID, roleID string) (fluxer.Role, bool) {
 }
 
 func (c *Cache) Member(guildID, userID string) (fluxer.Member, bool) {
-	return c.store.Members().Get(guildID, userID)
+	m, ok := c.store.Members().Get(guildID, userID)
+	if ok {
+		m = c.complete(m)
+	}
+	return m, ok
+}
+
+func (c *Cache) complete(m fluxer.Member) fluxer.Member {
+	if m.User != nil && m.User.Username == "" {
+		if u, ok := c.store.Users().Get("", m.User.ID); ok {
+			m.User = &u
+		}
+	}
+	return m
+}
+
+func (c *Cache) MemberPartial(guildID, userID string) bool {
+	m, ok := c.Member(guildID, userID)
+	return ok && (m.User == nil || m.User.Username == "")
+}
+
+func (c *Cache) User(id string) (fluxer.User, bool) { return c.store.Users().Get("", id) }
+
+func (c *Cache) Presence(guildID, userID string) (fluxer.Presence, bool) {
+	return c.store.Presences().Get(guildID, userID)
+}
+
+func (c *Cache) Presences(guildID string) []fluxer.Presence {
+	out := slices.Collect(maps.Values(maps.Collect(c.store.Presences().Group(guildID))))
+	slices.SortFunc(out, func(a, b fluxer.Presence) int { return fluxer.CompareSnowflakes(a.User.ID, b.User.ID) })
+	return out
+}
+
+func (c *Cache) putUser(u fluxer.User) {
+	if u.ID == "" || u.Username == "" || !c.flags.Has(FlagUsers) {
+		return
+	}
+	c.store.Users().Put("", u.ID, u)
+}
+
+func (c *Cache) putPresence(guildID string, p fluxer.Presence) {
+	if guildID == "" {
+		guildID = p.GuildID
+	}
+	if guildID == "" || p.User.ID == "" || !c.flags.Has(FlagPresences) {
+		return
+	}
+	c.putUser(p.User)
+	if p.Status == fluxer.StatusOffline || p.Status == "" {
+		c.store.Presences().Delete(guildID, p.User.ID)
+		return
+	}
+	p.GuildID = guildID
+	c.store.Presences().Put(guildID, p.User.ID, p)
 }
 
 func (c *Cache) Members(guildID string) []fluxer.Member {
-	out := slices.Collect(maps.Values(maps.Collect(c.store.Members().Group(guildID))))
+	var out []fluxer.Member
+	for _, m := range c.store.Members().Group(guildID) {
+		out = append(out, c.complete(m))
+	}
 	slices.SortFunc(out, func(a, b fluxer.Member) int { return fluxer.CompareSnowflakes(a.User.ID, b.User.ID) })
 	return out
 }

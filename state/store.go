@@ -32,4 +32,6 @@ type Store interface {
 	VoiceStates() Table[fluxer.VoiceState]
 	Emojis() Table[fluxer.Emoji]
 	Stickers() Table[fluxer.Sticker]
+	Users() Table[fluxer.User]
+	Presences() Table[fluxer.Presence]
 }

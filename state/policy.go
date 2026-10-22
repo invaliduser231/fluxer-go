@@ -17,8 +17,11 @@ const (
 	FlagVoiceStates
 	FlagEmojis
 	FlagStickers
+	FlagUsers
+	FlagPresences
 
-	FlagsAll = FlagGuilds | FlagChannels | FlagThreads | FlagRoles | FlagMembers | FlagVoiceStates | FlagEmojis | FlagStickers
+	FlagsAll = FlagGuilds | FlagChannels | FlagThreads | FlagRoles | FlagMembers | FlagVoiceStates | FlagEmojis | FlagStickers |
+		FlagUsers | FlagPresences
 )
 
 func (f Flags) Has(flag Flags) bool { return f&flag == flag }
@@ -64,6 +67,16 @@ func MemberOwner() Policy[fluxer.Member] {
 	return func(c *Cache, m fluxer.Member) bool {
 		rec, ok := c.store.Guilds().Get("", m.GuildID)
 		return ok && m.User != nil && rec.Guild.OwnerID == m.User.ID
+	}
+}
+
+func MembersOnline() Policy[fluxer.Member] {
+	return func(c *Cache, m fluxer.Member) bool {
+		if m.User == nil {
+			return false
+		}
+		p, ok := c.Presence(m.GuildID, m.User.ID)
+		return ok && p.Status != fluxer.StatusOffline
 	}
 }
 

@@ -145,24 +145,28 @@ func (t *MemoryTable[V]) Locate(key string) (string, bool) {
 }
 
 type MemoryStore struct {
-	guilds   *MemoryTable[GuildRecord]
-	channels *MemoryTable[fluxer.Channel]
-	roles    *MemoryTable[fluxer.Role]
-	members  *MemoryTable[fluxer.Member]
-	voice    *MemoryTable[fluxer.VoiceState]
-	emojis   *MemoryTable[fluxer.Emoji]
-	stickers *MemoryTable[fluxer.Sticker]
+	guilds    *MemoryTable[GuildRecord]
+	channels  *MemoryTable[fluxer.Channel]
+	roles     *MemoryTable[fluxer.Role]
+	members   *MemoryTable[fluxer.Member]
+	voice     *MemoryTable[fluxer.VoiceState]
+	emojis    *MemoryTable[fluxer.Emoji]
+	stickers  *MemoryTable[fluxer.Sticker]
+	users     *MemoryTable[fluxer.User]
+	presences *MemoryTable[fluxer.Presence]
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		guilds:   NewMemoryTable[GuildRecord](false),
-		channels: NewMemoryTable[fluxer.Channel](true),
-		roles:    NewMemoryTable[fluxer.Role](false),
-		members:  NewMemoryTable[fluxer.Member](false),
-		voice:    NewMemoryTable[fluxer.VoiceState](false),
-		emojis:   NewMemoryTable[fluxer.Emoji](false),
-		stickers: NewMemoryTable[fluxer.Sticker](false),
+		guilds:    NewMemoryTable[GuildRecord](false),
+		channels:  NewMemoryTable[fluxer.Channel](true),
+		roles:     NewMemoryTable[fluxer.Role](false),
+		members:   NewMemoryTable[fluxer.Member](false),
+		voice:     NewMemoryTable[fluxer.VoiceState](false),
+		emojis:    NewMemoryTable[fluxer.Emoji](false),
+		stickers:  NewMemoryTable[fluxer.Sticker](false),
+		users:     NewMemoryTable[fluxer.User](false),
+		presences: NewMemoryTable[fluxer.Presence](false),
 	}
 }
 
@@ -173,3 +177,5 @@ func (s *MemoryStore) Members() Table[fluxer.Member]         { return s.members 
 func (s *MemoryStore) VoiceStates() Table[fluxer.VoiceState] { return s.voice }
 func (s *MemoryStore) Emojis() Table[fluxer.Emoji]           { return s.emojis }
 func (s *MemoryStore) Stickers() Table[fluxer.Sticker]       { return s.stickers }
+func (s *MemoryStore) Users() Table[fluxer.User]             { return s.users }
+func (s *MemoryStore) Presences() Table[fluxer.Presence]     { return s.presences }
