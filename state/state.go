@@ -16,8 +16,11 @@ type Cache struct {
 	SkipMembers bool
 	OnError     func(event string, err error)
 
-	store Store
-	locks [lockStripes]sync.Mutex
+	store         Store
+	flags         Flags
+	memberPolicy  Policy[fluxer.Member]
+	channelPolicy Policy[fluxer.Channel]
+	locks         [lockStripes]sync.Mutex
 
 	selfMu sync.RWMutex
 	self   fluxer.User
@@ -28,7 +31,7 @@ type Option func(*Cache)
 func WithStore(s Store) Option { return func(c *Cache) { c.store = s } }
 
 func New(opts ...Option) *Cache {
-	c := &Cache{}
+	c := &Cache{flags: FlagsAll}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -133,7 +136,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		for _, g := range e.Guilds {
 			rec, _ := s.Guilds().Get("", g.ID)
 			rec.Guild.ID, rec.Unavailable = g.ID, g.Unavailable
-			s.Guilds().Put("", g.ID, rec)
+			c.putRecord(g.ID, rec)
 		}
 	case *fluxer.UserUpdate:
 		c.selfMu.Lock()
@@ -156,35 +159,29 @@ func (c *Cache) apply(e fluxer.Event) {
 			info.OnlineCount = rec.Guild.OnlineCount
 		}
 		rec.Guild = info
-		s.Guilds().Put("", e.ID, rec)
+		c.putRecord(e.ID, rec)
 	case *fluxer.GuildDelete:
 		if e.Unavailable {
 			rec := c.record(e.ID)
 			rec.Unavailable = true
-			s.Guilds().Put("", e.ID, rec)
+			c.putRecord(e.ID, rec)
 			return
 		}
 		c.dropGuild(e.ID)
 	case *fluxer.GuildRoleCreate:
-		s.Roles().Put(e.GuildID, e.Role.ID, e.Role)
+		c.putRole(e.GuildID, e.Role)
 	case *fluxer.GuildRoleUpdate:
-		s.Roles().Put(e.GuildID, e.Role.ID, e.Role)
+		c.putRole(e.GuildID, e.Role)
 	case *fluxer.GuildRoleUpdateBulk:
 		for _, r := range e.Roles {
-			s.Roles().Put(e.GuildID, r.ID, r)
+			c.putRole(e.GuildID, r)
 		}
 	case *fluxer.GuildRoleDelete:
 		s.Roles().Delete(e.GuildID, e.RoleID)
 	case *fluxer.GuildEmojisUpdate:
-		s.Emojis().DeleteGroup(e.GuildID)
-		for _, em := range e.Emojis {
-			s.Emojis().Put(e.GuildID, em.ID, em)
-		}
+		c.putEmojis(e.GuildID, e.Emojis)
 	case *fluxer.GuildStickersUpdate:
-		s.Stickers().DeleteGroup(e.GuildID)
-		for _, st := range e.Stickers {
-			s.Stickers().Put(e.GuildID, st.ID, st)
-		}
+		c.putStickers(e.GuildID, e.Stickers)
 	case *fluxer.ChannelCreate:
 		c.putChannel(e.Channel)
 	case *fluxer.ChannelUpdate:
@@ -241,14 +238,14 @@ func (c *Cache) apply(e fluxer.Event) {
 		c.putMember(e.GuildID, e.Member)
 		rec := c.record(e.GuildID)
 		rec.Guild.MemberCount++
-		s.Guilds().Put("", e.GuildID, rec)
+		c.putRecord(e.GuildID, rec)
 	case *fluxer.GuildMemberUpdate:
 		c.putMember(e.GuildID, e.Member)
 	case *fluxer.GuildMemberRemove:
 		s.Members().Delete(e.GuildID, e.User.ID)
 		rec := c.record(e.GuildID)
 		rec.Guild.MemberCount = max(rec.Guild.MemberCount-1, 0)
-		s.Guilds().Put("", e.GuildID, rec)
+		c.putRecord(e.GuildID, rec)
 	case *fluxer.GuildMembersChunk:
 		for _, m := range e.Members {
 			c.putMember(e.GuildID, m)
@@ -287,7 +284,7 @@ func (c *Cache) putGuild(gs fluxer.GuildState) {
 	rec := c.record(gs.ID)
 	if gs.Unavailable {
 		rec.Unavailable = true
-		s.Guilds().Put("", gs.ID, rec)
+		c.putRecord(gs.ID, rec)
 		return
 	}
 	info := gs.Properties
@@ -298,19 +295,13 @@ func (c *Cache) putGuild(gs fluxer.GuildState) {
 	if gs.JoinedAt != nil {
 		rec.JoinedAt = gs.JoinedAt
 	}
-	s.Guilds().Put("", gs.ID, rec)
+	c.putRecord(gs.ID, rec)
 	s.Roles().DeleteGroup(gs.ID)
 	for _, r := range gs.Roles {
-		s.Roles().Put(gs.ID, r.ID, r)
+		c.putRole(gs.ID, r)
 	}
-	s.Emojis().DeleteGroup(gs.ID)
-	for _, em := range gs.Emojis {
-		s.Emojis().Put(gs.ID, em.ID, em)
-	}
-	s.Stickers().DeleteGroup(gs.ID)
-	for _, st := range gs.Stickers {
-		s.Stickers().Put(gs.ID, st.ID, st)
-	}
+	c.putEmojis(gs.ID, gs.Emojis)
+	c.putStickers(gs.ID, gs.Stickers)
 	for chID := range s.Channels().Group(gs.ID) {
 		s.Channels().Delete(gs.ID, chID)
 	}
@@ -318,12 +309,44 @@ func (c *Cache) putGuild(gs fluxer.GuildState) {
 		ch.GuildID = gs.ID
 		c.putChannel(ch)
 	}
-	for _, m := range gs.Members {
-		c.putMember(gs.ID, m)
-	}
 	s.VoiceStates().DeleteGroup(gs.ID)
 	for _, v := range gs.VoiceStates {
 		c.putVoice(gs.ID, v)
+	}
+	for _, m := range gs.Members {
+		c.putMember(gs.ID, m)
+	}
+}
+
+func (c *Cache) putRecord(id string, rec GuildRecord) {
+	if c.flags.Has(FlagGuilds) {
+		c.store.Guilds().Put("", id, rec)
+	}
+}
+
+func (c *Cache) putRole(guildID string, r fluxer.Role) {
+	if c.flags.Has(FlagRoles) {
+		c.store.Roles().Put(guildID, r.ID, r)
+	}
+}
+
+func (c *Cache) putEmojis(guildID string, emojis []fluxer.Emoji) {
+	c.store.Emojis().DeleteGroup(guildID)
+	if !c.flags.Has(FlagEmojis) {
+		return
+	}
+	for _, em := range emojis {
+		c.store.Emojis().Put(guildID, em.ID, em)
+	}
+}
+
+func (c *Cache) putStickers(guildID string, stickers []fluxer.Sticker) {
+	c.store.Stickers().DeleteGroup(guildID)
+	if !c.flags.Has(FlagStickers) {
+		return
+	}
+	for _, st := range stickers {
+		c.store.Stickers().Put(guildID, st.ID, st)
 	}
 }
 
@@ -336,6 +359,10 @@ func (c *Cache) channel(id string) (fluxer.Channel, bool) {
 }
 
 func (c *Cache) putChannel(ch fluxer.Channel) {
+	if !c.keepChannel(ch) {
+		c.deleteChannel(ch.ID)
+		return
+	}
 	if old, ok := c.store.Channels().Locate(ch.ID); ok && old != ch.GuildID {
 		c.store.Channels().Delete(old, ch.ID)
 	}
@@ -352,13 +379,14 @@ func (c *Cache) putMember(guildID string, m fluxer.Member) {
 	if m.User == nil || guildID == "" {
 		return
 	}
-	if c.SkipMembers && m.User.ID != c.Self().ID {
-		return
-	}
 	if old, ok := c.store.Members().Get(guildID, m.User.ID); ok && old.User != nil && m.User.Username == "" {
 		m.User = old.User
 	}
 	m.GuildID = guildID
+	if !c.keepMember(m) {
+		c.store.Members().Delete(guildID, m.User.ID)
+		return
+	}
 	c.store.Members().Put(guildID, m.User.ID, m)
 }
 
@@ -376,9 +404,15 @@ func (c *Cache) putVoice(guildID string, v fluxer.VoiceState) {
 	if guildID == "" {
 		return
 	}
+	if !c.flags.Has(FlagVoiceStates) {
+		return
+	}
 	key := voiceKey(v)
 	if v.ChannelID == "" {
 		c.store.VoiceStates().Delete(guildID, key)
+		if m, ok := c.store.Members().Get(guildID, v.UserID); ok && !c.keepMember(m) {
+			c.store.Members().Delete(guildID, v.UserID)
+		}
 		return
 	}
 	if old, ok := c.store.VoiceStates().Get(guildID, key); ok && old.Version > v.Version {
