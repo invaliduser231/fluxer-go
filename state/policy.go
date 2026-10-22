@@ -19,9 +19,10 @@ const (
 	FlagStickers
 	FlagUsers
 	FlagPresences
+	FlagMessages
 
 	FlagsAll = FlagGuilds | FlagChannels | FlagThreads | FlagRoles | FlagMembers | FlagVoiceStates | FlagEmojis | FlagStickers |
-		FlagUsers | FlagPresences
+		FlagUsers | FlagPresences | FlagMessages
 )
 
 func (f Flags) Has(flag Flags) bool { return f&flag == flag }

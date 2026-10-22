@@ -154,6 +154,7 @@ type MemoryStore struct {
 	stickers  *MemoryTable[fluxer.Sticker]
 	users     *MemoryTable[fluxer.User]
 	presences *MemoryTable[fluxer.Presence]
+	messages  *MemoryTable[fluxer.Message]
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -167,6 +168,7 @@ func NewMemoryStore() *MemoryStore {
 		stickers:  NewMemoryTable[fluxer.Sticker](false),
 		users:     NewMemoryTable[fluxer.User](false),
 		presences: NewMemoryTable[fluxer.Presence](false),
+		messages:  NewMemoryTable[fluxer.Message](true),
 	}
 }
 
@@ -179,3 +181,4 @@ func (s *MemoryStore) Emojis() Table[fluxer.Emoji]           { return s.emojis }
 func (s *MemoryStore) Stickers() Table[fluxer.Sticker]       { return s.stickers }
 func (s *MemoryStore) Users() Table[fluxer.User]             { return s.users }
 func (s *MemoryStore) Presences() Table[fluxer.Presence]     { return s.presences }
+func (s *MemoryStore) Messages() Table[fluxer.Message]       { return s.messages }

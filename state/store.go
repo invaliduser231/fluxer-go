@@ -34,4 +34,5 @@ type Store interface {
 	Stickers() Table[fluxer.Sticker]
 	Users() Table[fluxer.User]
 	Presences() Table[fluxer.Presence]
+	Messages() Table[fluxer.Message]
 }

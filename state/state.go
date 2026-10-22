@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/invaliduser231/fluxer-go"
 )
@@ -20,6 +21,10 @@ type Cache struct {
 	flags         Flags
 	memberPolicy  Policy[fluxer.Member]
 	channelPolicy Policy[fluxer.Channel]
+	messagePolicy Policy[fluxer.Message]
+	messageLimit  int
+	messageTTL    time.Duration
+	onEvict       func(fluxer.Message)
 	locks         [lockStripes]sync.Mutex
 
 	selfMu sync.RWMutex
@@ -118,6 +123,22 @@ func eventGuild(e fluxer.Event) string {
 		return e.GuildID
 	case *fluxer.PresenceUpdateBulk:
 		return e.GuildID
+	case *fluxer.MessageUpdate:
+		return e.GuildID
+	case *fluxer.MessageDelete:
+		return e.GuildID
+	case *fluxer.MessageDeleteBulk:
+		return e.GuildID
+	case *fluxer.MessageReactionAdd:
+		return e.GuildID
+	case *fluxer.MessageReactionAddMany:
+		return e.GuildID
+	case *fluxer.MessageReactionRemove:
+		return e.GuildID
+	case *fluxer.MessageReactionRemoveAll:
+		return e.GuildID
+	case *fluxer.MessageReactionRemoveEmoji:
+		return e.GuildID
 	}
 	return ""
 }
@@ -129,6 +150,7 @@ func (c *Cache) Apply(e fluxer.Event) {
 
 func (c *Cache) apply(e fluxer.Event) {
 	s := c.store
+	c.applyMessage(e)
 	switch e := e.(type) {
 	case *fluxer.Ready:
 		c.selfMu.Lock()
@@ -202,9 +224,11 @@ func (c *Cache) apply(e fluxer.Event) {
 	case *fluxer.ChannelDelete:
 		group, _ := s.Channels().Locate(e.ID)
 		c.deleteChannel(e.ID)
+		s.Messages().DeleteGroup(e.ID)
 		for id, ch := range s.Channels().Group(group) {
 			if ch.ParentID == e.ID && ch.IsThread() {
 				c.deleteChannel(id)
+				s.Messages().DeleteGroup(id)
 			}
 		}
 	case *fluxer.ThreadCreate:
@@ -213,6 +237,7 @@ func (c *Cache) apply(e fluxer.Event) {
 		c.putChannel(e.Channel)
 	case *fluxer.ThreadDelete:
 		c.deleteChannel(e.ID)
+		s.Messages().DeleteGroup(e.ID)
 	case *fluxer.ThreadListSync:
 		for id, ch := range s.Channels().Group(e.GuildID) {
 			if ch.IsThread() && (len(e.ChannelIDs) == 0 || slices.Contains(e.ChannelIDs, ch.ParentID)) {
@@ -298,6 +323,7 @@ func (c *Cache) dropGuild(id string) {
 	s := c.store
 	for chID := range s.Channels().Group(id) {
 		s.Channels().Delete(id, chID)
+		s.Messages().DeleteGroup(chID)
 	}
 	s.Roles().DeleteGroup(id)
 	s.Members().DeleteGroup(id)
