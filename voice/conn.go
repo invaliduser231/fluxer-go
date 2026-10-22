@@ -15,6 +15,8 @@ type Conn struct {
 	guildID string
 	opts    Options
 
+	playing sync.Mutex
+
 	mu           sync.Mutex
 	channelID    string
 	connectionID string
