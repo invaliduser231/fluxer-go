@@ -28,6 +28,7 @@ type Cache struct {
 	locks         [lockStripes]sync.Mutex
 	listeners     listeners
 	ready         readyState
+	counters      counters
 
 	selfMu sync.RWMutex
 	self   fluxer.User
