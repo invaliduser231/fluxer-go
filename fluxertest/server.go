@@ -37,6 +37,7 @@ type Server struct {
 	gw       gatewayState
 	gs       guildState
 	vs       voiceState
+	oauth    oauthState
 	ban      map[string]any
 	delay    time.Duration
 }
@@ -76,6 +77,7 @@ func NewServer(token string) *Server {
 	s.gatewayRoutes()
 	s.messageRoutes()
 	s.guildRoutes()
+	s.oauthRoutes()
 	s.Server = httptest.NewServer(s.mux)
 	return s
 }
