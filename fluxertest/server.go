@@ -94,6 +94,10 @@ func (s *Server) Handle(pattern string, h http.HandlerFunc) {
 	s.mux.HandleFunc(pattern, s.auth(h))
 }
 
+func (s *Server) HandleRaw(pattern string, h http.HandlerFunc) {
+	s.mux.HandleFunc(pattern, h)
+}
+
 func (s *Server) SetUser(u fluxer.User) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
