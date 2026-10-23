@@ -105,6 +105,11 @@ func (c *Client) once(ctx context.Context, method, path, route, contentType stri
 	if reason, ok := ctx.Value(reasonKey{}).(string); ok {
 		req.Header.Set("X-Audit-Log-Reason", reason)
 	}
+	if h, ok := ctx.Value(headersKey{}).(http.Header); ok {
+		for k, v := range h {
+			req.Header[k] = v
+		}
+	}
 	start := time.Now()
 	resp, err := c.httpClient().Do(req)
 	if c.Observe != nil {
