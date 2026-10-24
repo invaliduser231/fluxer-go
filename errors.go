@@ -9,14 +9,23 @@ import (
 	"time"
 )
 
+// ErrTokenRejected matches, through errors.Is, every *APIError with status 401.
+// Once a Client has seen a 401 it returns such an error for all later calls.
 var ErrTokenRejected = errors.New("fluxer: token rejected")
 
+// FieldError describes a validation problem with one field of a request body.
+// Path names the field.
 type FieldError struct {
 	Path    string `json:"path"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
+// APIError is an error response from the Fluxer API. Code is the error code
+// from the response body; when the body has none, Code is derived from the HTTP
+// status and Message holds the raw body. RequiredScope names the OAuth2 scope
+// the token lacks, if the API reports one. RequestID comes from the X-Request-ID
+// header and RetryAfter is set for 429 responses.
 type APIError struct {
 	Status        int
 	Code          string       `json:"code"`
@@ -27,6 +36,8 @@ type APIError struct {
 	RetryAfter    time.Duration
 }
 
+// Error formats the status, code and message, followed by the first field
+// error if there is one.
 func (e *APIError) Error() string {
 	msg := fmt.Sprintf("fluxer: %d %s: %s", e.Status, e.Code, e.Message)
 	if len(e.Errors) > 0 {
@@ -36,10 +47,13 @@ func (e *APIError) Error() string {
 	return msg
 }
 
+// Is reports whether target is ErrTokenRejected and the error has status 401.
 func (e *APIError) Is(target error) bool {
 	return target == ErrTokenRejected && e.Status == http.StatusUnauthorized
 }
 
+// ErrorCode returns the Code of the first *APIError in err's chain, or an
+// empty string if there is none.
 func ErrorCode(err error) string {
 	var e *APIError
 	if errors.As(err, &e) {

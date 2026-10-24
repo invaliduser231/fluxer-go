@@ -4,6 +4,12 @@ import "strings"
 
 var routeWords = map[string]bool{"@me": true, "bot": true, "bulk-delete": true}
 
+// MetricRoute reduces a route such as "GET /channels/123/messages" to a label
+// with few distinct values, here "GET /channels/:id/messages", for use in
+// metrics. Segments in ID positions become :id unless they are @me, bot or
+// bulk-delete, unexpected resource names become :?, and paths with more than
+// eight segments are cut off with "…". Client.Observe receives routes in this
+// form.
 func MetricRoute(route string) string {
 	method, path, _ := strings.Cut(route, " ")
 	parts := strings.Split(path, "/")

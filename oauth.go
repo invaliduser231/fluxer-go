@@ -15,6 +15,7 @@ import (
 	"time"
 )
 
+// OAuth2 scopes for OAuth.Scopes. ScopeBot is used by BotInviteURL.
 const (
 	ScopeIdentify    = "identify"
 	ScopeEmail       = "email"
@@ -23,6 +24,11 @@ const (
 	ScopeBot         = "bot"
 )
 
+// OAuth is an OAuth2 client for a Fluxer application. API is the API base URL
+// and defaults to DefaultAPI. Scopes defaults to ScopeIdentify. ClientSecret may
+// be empty for a public client that uses PKCE. HTTP defaults to a client with a
+// 15 second timeout. Requests made through OAuth are not rate limited or
+// retried.
 type OAuth struct {
 	API          string
 	ClientID     string
@@ -32,6 +38,7 @@ type OAuth struct {
 	HTTP         *http.Client
 }
 
+// OAuthToken is the response of the token endpoint. ExpiresIn is in seconds.
 type OAuthToken struct {
 	AccessToken  string `json:"access_token"`
 	TokenType    string `json:"token_type"`
@@ -40,23 +47,30 @@ type OAuthToken struct {
 	Scope        string `json:"scope"`
 }
 
+// Expiry returns when the access token expires, given the time it was issued.
 func (t OAuthToken) Expiry(issued time.Time) time.Time {
 	return issued.Add(time.Duration(t.ExpiresIn) * time.Second)
 }
 
+// OAuthError is an error response in the OAuth2 format. Code holds the error
+// field, such as invalid_grant.
 type OAuthError struct {
 	Code        string `json:"error"`
 	Description string `json:"error_description"`
 }
 
+// Error returns the OAuth2 error code and description.
 func (e *OAuthError) Error() string { return "fluxer: oauth2 " + e.Code + ": " + e.Description }
 
+// NewVerifier returns a random PKCE code verifier. Keep it until the code is
+// exchanged and pass it to both AuthorizeURL and Exchange.
 func NewVerifier() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
+// Challenge returns the S256 PKCE code challenge for verifier.
 func Challenge(verifier string) string {
 	sum := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
@@ -64,6 +78,9 @@ func Challenge(verifier string) string {
 
 func (o *OAuth) base() string { return strings.TrimSuffix(cmp.Or(o.API, DefaultAPI), "/") }
 
+// AuthorizeURL returns the authorization URL to send the user to. state is
+// added when non-empty. When verifier is non-empty, its S256 challenge is added
+// for PKCE.
 func (o *OAuth) AuthorizeURL(state, verifier string) string {
 	scopes := o.Scopes
 	if len(scopes) == 0 {
@@ -85,6 +102,9 @@ func (o *OAuth) AuthorizeURL(state, verifier string) string {
 	return o.base() + "/oauth2/authorize?" + q.Encode()
 }
 
+// BotInviteURL returns the URL that adds the bot of application clientID to a
+// guild. api is the API base URL and defaults to DefaultAPI. perms is left out
+// when zero, and a non-empty guildID preselects the guild.
 func BotInviteURL(api, clientID string, perms Permissions, guildID string) string {
 	q := url.Values{"client_id": {clientID}, "scope": {ScopeBot}}
 	if perms != 0 {
@@ -96,6 +116,10 @@ func BotInviteURL(api, clientID string, perms Permissions, guildID string) strin
 	return strings.TrimSuffix(cmp.Or(api, DefaultAPI), "/") + "/oauth2/authorize?" + q.Encode()
 }
 
+// Exchange trades an authorization code for a token at POST /oauth2/token.
+// verifier is the PKCE verifier given to AuthorizeURL, or empty if PKCE was not
+// used. Errors are *OAuthError when the server answers in the OAuth2 format and
+// *APIError otherwise.
 func (o *OAuth) Exchange(ctx context.Context, code, verifier string) (*OAuthToken, error) {
 	form := url.Values{
 		"grant_type":   {"authorization_code"},
@@ -108,6 +132,7 @@ func (o *OAuth) Exchange(ctx context.Context, code, verifier string) (*OAuthToke
 	return o.token(ctx, form)
 }
 
+// Refresh trades a refresh token for a new token at POST /oauth2/token.
 func (o *OAuth) Refresh(ctx context.Context, refreshToken string) (*OAuthToken, error) {
 	return o.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}})
 }
@@ -126,6 +151,7 @@ func (o *OAuth) token(ctx context.Context, form url.Values) (*OAuthToken, error)
 	return &t, o.do(req, &t)
 }
 
+// Revoke revokes an access or refresh token at POST /oauth2/token/revoke.
 func (o *OAuth) Revoke(ctx context.Context, token string) error {
 	form := url.Values{"token": {token}, "client_id": {o.ClientID}}
 	if o.ClientSecret != "" {
@@ -139,6 +165,8 @@ func (o *OAuth) Revoke(ctx context.Context, token string) error {
 	return o.do(req, nil)
 }
 
+// User returns the user an access token belongs to. It calls
+// GET /oauth2/userinfo.
 func (o *OAuth) User(ctx context.Context, accessToken string) (*User, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.base()+"/oauth2/userinfo", nil)
 	if err != nil {

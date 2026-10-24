@@ -8,12 +8,20 @@ import (
 	"strconv"
 )
 
+// File is a file sent with DoFiles or Upload. Name is the file name and
+// Description is sent as the attachment description.
 type File struct {
 	Name        string
 	Description string
 	Data        []byte
 }
 
+// DoFiles sends a multipart/form-data request with body encoded as the
+// payload_json field and files as files[0], files[1] and so on, and decodes the
+// response into out. When any file has a Description, an attachments array with
+// ids, filenames and descriptions is added to the payload; this only works when
+// body encodes as a JSON object, otherwise the descriptions are dropped. Without
+// files DoFiles behaves like Do. Retries follow the same rules as Do.
 func (c *Client) DoFiles(ctx context.Context, method, path string, body any, files []File, out any) error {
 	if len(files) == 0 {
 		return c.Do(ctx, method, path, body, out)

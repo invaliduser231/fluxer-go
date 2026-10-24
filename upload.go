@@ -13,11 +13,16 @@ import (
 
 const maxUploadsPerPlan = 10
 
+// UploadPart is one part of a multipart upload and the presigned URL it is
+// sent to. PartNumber starts at 1.
 type UploadPart struct {
 	PartNumber int    `json:"part_number"`
 	UploadURL  string `json:"upload_url"`
 }
 
+// UploadPlan is the server's upload instruction for one file. UploadMode is
+// "singlepart", where the whole file goes to UploadURL, or "multipart", where
+// the file is split into Parts of PartSize bytes.
 type UploadPlan struct {
 	ID             int          `json:"id"`
 	Filename       string       `json:"filename"`
@@ -31,6 +36,8 @@ type UploadPlan struct {
 	Parts          []UploadPart `json:"parts,omitempty"`
 }
 
+// UploadedFile describes a file uploaded with Upload. Add it to
+// MessageSend.Attachments to attach the file to a message.
 type UploadedFile struct {
 	ID             int    `json:"id"`
 	Filename       string `json:"filename"`
@@ -47,6 +54,15 @@ func contentType(f File) string {
 	return http.DetectContentType(f.Data)
 }
 
+// Upload uploads files to storage through presigned URLs and returns them in
+// a form that can be attached to a message in channelID. It requests an upload
+// plan with POST /channels/{id}/attachments, PUTs each file or part, and
+// finishes multipart uploads with POST /channels/{id}/attachments/complete. At
+// most 10 files are accepted per call. The content type is guessed from the file
+// extension, falling back to the data.
+//
+// The PUT requests use the transport of the Client's HTTP client but neither its
+// timeout nor the Authorization header, so bound them with ctx.
 func (c *Client) Upload(ctx context.Context, channelID string, files []File) ([]UploadedFile, error) {
 	if len(files) == 0 {
 		return nil, nil
@@ -143,6 +159,8 @@ func (c *Client) put(ctx context.Context, target, contentType string, data []byt
 	return nil
 }
 
+// SendMessageUploads uploads files with Upload and sends m to channelID with
+// the uploaded files appended to its attachments.
 func (c *Client) SendMessageUploads(ctx context.Context, channelID string, m MessageSend, files []File) (*Message, error) {
 	uploaded, err := c.Upload(ctx, channelID, files)
 	if err != nil {
@@ -152,6 +170,9 @@ func (c *Client) SendMessageUploads(ctx context.Context, channelID string, m Mes
 	return c.SendMessage(ctx, channelID, m)
 }
 
+// RefreshAttachmentURLs requests new signed URLs for the given attachment URLs
+// with POST /attachments/refresh-urls. The result maps each original URL to its
+// new URL; URLs the API did not refresh are missing from the map.
 func (c *Client) RefreshAttachmentURLs(ctx context.Context, urls []string) (map[string]string, error) {
 	var r struct {
 		RefreshedURLs []struct {

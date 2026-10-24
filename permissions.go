@@ -7,8 +7,11 @@ import (
 	"strings"
 )
 
+// Permissions is a set of permission bits. In JSON it is a decimal string, the
+// form the Fluxer API uses.
 type Permissions uint64
 
+// Permission bits used by the Fluxer API.
 const (
 	PermCreateInstantInvite   Permissions = 1 << 0
 	PermKickMembers           Permissions = 1 << 1
@@ -52,6 +55,8 @@ const (
 	PermUpdateRTCRegion       Permissions = 1 << 53
 	PermViewChannelMembers    Permissions = 1 << 54
 
+	// PermAll has every bit set. BasePermissions returns it for the guild owner
+	// and for members with PermAdministrator.
 	PermAll Permissions = 1<<64 - 1
 )
 
@@ -72,14 +77,20 @@ var permissionNames = map[Permissions]string{
 	PermUpdateRTCRegion: "UPDATE_RTC_REGION", PermViewChannelMembers: "VIEW_CHANNEL_MEMBERS",
 }
 
+// Has reports whether p contains every bit of perms.
 func (p Permissions) Has(perms Permissions) bool { return p&perms == perms }
 
+// Add returns p with the bits of perms set.
 func (p Permissions) Add(perms Permissions) Permissions { return p | perms }
 
+// Remove returns p with the bits of perms cleared.
 func (p Permissions) Remove(perms Permissions) Permissions { return p &^ perms }
 
+// Missing returns the bits of perms that p lacks.
 func (p Permissions) Missing(perms Permissions) Permissions { return perms &^ p }
 
+// Names returns the API names of the bits set in p, such as SEND_MESSAGES,
+// from the lowest bit up. Bits without a known name are skipped.
 func (p Permissions) Names() []string {
 	var names []string
 	for rest := p; rest != 0; rest &= rest - 1 {
@@ -91,6 +102,8 @@ func (p Permissions) Names() []string {
 	return names
 }
 
+// String returns the names of the set bits joined by "|", or "NONE" when p is
+// zero.
 func (p Permissions) String() string {
 	if p == 0 {
 		return "NONE"
@@ -98,10 +111,13 @@ func (p Permissions) String() string {
 	return strings.Join(p.Names(), "|")
 }
 
+// MarshalJSON encodes p as a quoted decimal number.
 func (p Permissions) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + strconv.FormatUint(uint64(p), 10) + `"`), nil
 }
 
+// UnmarshalJSON accepts a decimal number, quoted or not. null and an empty
+// string decode as zero.
 func (p *Permissions) UnmarshalJSON(data []byte) error {
 	s := string(data)
 	if s == "null" {

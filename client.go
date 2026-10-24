@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+// DefaultAPI, DefaultGateway and DefaultMedia are the endpoints of the public
+// fluxer.app instance. Use Discover to find the endpoints of a self-hosted instance.
 const (
 	DefaultAPI       = "https://api.fluxer.app/v1"
 	DefaultGateway   = "wss://gateway.fluxer.app"
@@ -24,6 +26,19 @@ const (
 	defaultBodyLimit = 8 << 20
 )
 
+// Client is a REST client for the Fluxer API. It learns rate limit buckets from
+// response headers and waits before sending a request into a bucket that is
+// exhausted or while a global rate limit is active. A Client is safe for
+// concurrent use once its fields are set.
+//
+// After the API answers a request with 401, the Client considers its token
+// rejected and fails every later call with an *APIError matching
+// ErrTokenRejected without contacting the API.
+//
+// MaxRetries limits retries of transient failures, see Do. BodyLimit caps how
+// many bytes of a response body are read and defaults to 8 MiB. Observe, when
+// set, is called after every HTTP round trip with the route in MetricRoute form,
+// the status code (0 on a transport error) and the duration.
 type Client struct {
 	BaseURL    string
 	Token      string
@@ -40,6 +55,10 @@ type Client struct {
 	globalUntil time.Time
 }
 
+// NewClient returns a Client for the public fluxer.app API that authenticates
+// as the bot with the given token. Surrounding whitespace and a leading "Bot "
+// prefix are removed from token. The client uses a 15 second HTTP timeout and
+// retries up to 3 times.
 func NewClient(token string) *Client {
 	return &Client{
 		BaseURL:    DefaultAPI,
@@ -52,6 +71,16 @@ func NewClient(token string) *Client {
 
 type nonced interface{ nonce() string }
 
+// Do sends a request to path, relative to BaseURL, with body encoded as JSON,
+// and decodes the response into out when out is non-nil. A nil body sends no
+// request body. Responses with a status of 300 or higher are returned as
+// *APIError.
+//
+// Do waits for known rate limits before sending. It retries 429 responses after
+// the advertised delay, and 423, 502, 503 and 504 responses after Retry-After or
+// one second, up to MaxRetries times. A POST is only retried on 429, unless body
+// carries a nonce, as a MessageSend with Nonce set does. Transport errors are not
+// retried. A reason set with WithReason is sent as X-Audit-Log-Reason.
 func (c *Client) Do(ctx context.Context, method, path string, body, out any) error {
 	var payload []byte
 	if body != nil {

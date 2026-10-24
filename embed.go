@@ -2,6 +2,8 @@ package fluxer
 
 import "time"
 
+// Embed is rich content attached to a message. Timestamp is an RFC 3339 string; use
+// SetTimestamp to fill it from a time.Time. Color is nil when no color is set.
 type Embed struct {
 	Type        string         `json:"type,omitempty"`
 	Title       string         `json:"title,omitempty"`
@@ -19,6 +21,7 @@ type Embed struct {
 	Fields      []EmbedField   `json:"fields,omitempty"`
 }
 
+// EmbedAuthor is the author line of an embed.
 type EmbedAuthor struct {
 	Name         string `json:"name"`
 	URL          string `json:"url,omitempty"`
@@ -26,6 +29,8 @@ type EmbedAuthor struct {
 	ProxyIconURL string `json:"proxy_icon_url,omitempty"`
 }
 
+// EmbedMedia is an image, thumbnail, video or audio item in an embed. ProxyURL and the
+// dimensions are filled in by the server.
 type EmbedMedia struct {
 	URL         string `json:"url"`
 	ProxyURL    string `json:"proxy_url,omitempty"`
@@ -35,33 +40,40 @@ type EmbedMedia struct {
 	Description string `json:"description,omitempty"`
 }
 
+// EmbedFooter is the footer of an embed.
 type EmbedFooter struct {
 	Text         string `json:"text"`
 	IconURL      string `json:"icon_url,omitempty"`
 	ProxyIconURL string `json:"proxy_icon_url,omitempty"`
 }
 
+// EmbedProvider names the site an embed was generated from.
 type EmbedProvider struct {
 	Name string `json:"name"`
 	URL  string `json:"url,omitempty"`
 }
 
+// EmbedField is a name and value pair shown in an embed. Inline fields may be placed
+// side by side.
 type EmbedField struct {
 	Name   string `json:"name"`
 	Value  string `json:"value"`
 	Inline bool   `json:"inline"`
 }
 
+// SetColor sets the embed color to rgb, given as 0xRRGGBB, and returns e.
 func (e *Embed) SetColor(rgb int) *Embed {
 	e.Color = &rgb
 	return e
 }
 
+// SetTimestamp sets the embed timestamp to t in UTC and returns e.
 func (e *Embed) SetTimestamp(t time.Time) *Embed {
 	e.Timestamp = t.UTC().Format(time.RFC3339)
 	return e
 }
 
+// AddField appends a field to the embed and returns e.
 func (e *Embed) AddField(name, value string, inline bool) *Embed {
 	e.Fields = append(e.Fields, EmbedField{Name: name, Value: value, Inline: inline})
 	return e

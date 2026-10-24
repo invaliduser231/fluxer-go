@@ -12,11 +12,16 @@ import (
 	"time"
 )
 
+// DefaultInstance is the origin of the public Fluxer instance.
 const (
 	DefaultInstance = "https://fluxer.app"
 	discoveryLimit  = 256 << 10
 )
 
+// Instance holds the endpoints and features of a Fluxer instance, as read from
+// its discovery document at /.well-known/fluxer. API already includes the /v1
+// suffix. HTTP, when non-nil, is used by clients and sessions created from the
+// Instance.
 type Instance struct {
 	Origin      string
 	API         string
@@ -30,6 +35,8 @@ type Instance struct {
 	HTTP        *http.Client
 }
 
+// InstanceFeatures lists the optional features an instance reports in its
+// discovery document.
 type InstanceFeatures struct {
 	VoiceEnabled               bool `json:"voice_enabled"`
 	SelfHosted                 bool `json:"self_hosted"`
@@ -37,6 +44,8 @@ type InstanceFeatures struct {
 	DiscoveryEnabled           bool `json:"discovery_enabled"`
 }
 
+// NewClient returns a Client for the instance's API, using the instance's HTTP
+// client if it has one.
 func (i *Instance) NewClient(token string) *Client {
 	c := NewClient(token)
 	c.BaseURL = i.API
@@ -46,10 +55,18 @@ func (i *Instance) NewClient(token string) *Client {
 	return c
 }
 
+// Discover reads the discovery document of the instance at origin with
+// http.DefaultClient. See DiscoverWith.
 func Discover(ctx context.Context, origin string) (*Instance, error) {
 	return DiscoverWith(ctx, http.DefaultClient, origin)
 }
 
+// DiscoverWith fetches origin + "/.well-known/fluxer" with client and returns
+// the instance it describes. origin should already be normalized, see
+// NormalizeOrigin. The request times out after 10 seconds. It fails when the
+// server does not answer 200, the document is larger than 256 KiB, or it lacks
+// the api_public or gateway endpoint. A client other than http.DefaultClient is
+// kept in Instance.HTTP.
 func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Instance, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -110,6 +127,10 @@ func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Ins
 	return inst, nil
 }
 
+// NormalizeOrigin turns user input such as "Chat.Example.com" into a lowercase
+// origin like "https://chat.example.com". It adds https:// when no scheme is
+// given and rejects schemes other than http and https as well as addresses with
+// a path, query, fragment or user info.
 func NormalizeOrigin(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if !strings.Contains(raw, "://") {

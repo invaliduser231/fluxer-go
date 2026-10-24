@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// UserProfile is a user's profile. Profile holds the raw profile fields, Member
+// is set when the profile was requested for a guild, and Limited reports that
+// the API returned a limited profile.
 type UserProfile struct {
 	User           User              `json:"user"`
 	Profile        map[string]any    `json:"user_profile"`
@@ -17,11 +20,13 @@ type UserProfile struct {
 	Limited        bool              `json:"profile_limited,omitempty"`
 }
 
+// Bio returns the bio from the profile fields, or an empty string.
 func (p UserProfile) Bio() string {
 	bio, _ := p.Profile["bio"].(string)
 	return bio
 }
 
+// PublicApplication is the public information about an application.
 type PublicApplication struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
@@ -33,6 +38,8 @@ type PublicApplication struct {
 	Bot          *User    `json:"bot,omitempty"`
 }
 
+// TokenInfo is the result of token introspection. Active reports whether the
+// token is valid. Expires and IssuedAt are Unix times in seconds.
 type TokenInfo struct {
 	Active    bool   `json:"active"`
 	Scope     string `json:"scope,omitempty"`
@@ -44,6 +51,9 @@ type TokenInfo struct {
 	Subject   string `json:"sub,omitempty"`
 }
 
+// UserProfile returns the profile of userID. With a non-empty guildID the
+// profile includes the user's membership in that guild. It calls
+// GET /users/{id}/profile.
 func (c *Client) UserProfile(ctx context.Context, userID, guildID string) (*UserProfile, error) {
 	path := "/users/" + userID + "/profile"
 	if guildID != "" {
@@ -53,6 +63,8 @@ func (c *Client) UserProfile(ctx context.Context, userID, guildID string) (*User
 	return &p, c.Do(ctx, http.MethodGet, path, nil, &p)
 }
 
+// TagTaken reports whether the combination of username and discriminator is
+// already in use. It calls GET /users/check-tag.
 func (c *Client) TagTaken(ctx context.Context, username, discriminator string) (bool, error) {
 	q := url.Values{"username": {username}, "discriminator": {discriminator}}
 	var r struct {
@@ -62,16 +74,22 @@ func (c *Client) TagTaken(ctx context.Context, username, discriminator string) (
 	return r.Taken, err
 }
 
+// OAuthApplication returns the application of the current token. It calls
+// GET /oauth2/applications/@me.
 func (c *Client) OAuthApplication(ctx context.Context) (*Application, error) {
 	var a Application
 	return &a, c.Do(ctx, http.MethodGet, "/oauth2/applications/@me", nil, &a)
 }
 
+// PublicApplication returns the public information of an application. It
+// calls GET /oauth2/applications/{id}/public.
 func (c *Client) PublicApplication(ctx context.Context, applicationID string) (*PublicApplication, error) {
 	var a PublicApplication
 	return &a, c.Do(ctx, http.MethodGet, "/oauth2/applications/"+applicationID+"/public", nil, &a)
 }
 
+// Introspect asks the server about token at POST /oauth2/introspect,
+// authenticating with the client credentials.
 func (o *OAuth) Introspect(ctx context.Context, token string) (*TokenInfo, error) {
 	form := url.Values{"token": {token}, "client_id": {o.ClientID}}
 	if o.ClientSecret != "" {
