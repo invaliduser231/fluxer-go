@@ -24,6 +24,9 @@ func TestHierarchyAndLookups(t *testing.T) {
 	if m, ok := c.FindMember("3", "@BEN#0042"); !ok || m.User.ID != "8" {
 		t.Errorf("by tag %+v", m)
 	}
+	if _, ok := c.FindMember("3", " "); ok {
+		t.Error("empty name matched")
+	}
 	if m, ok := c.FindMember("3", "an"); !ok || m.User.ID != "7" {
 		t.Errorf("by prefix %+v", m)
 	}

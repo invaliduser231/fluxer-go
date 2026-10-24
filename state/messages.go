@@ -61,6 +61,7 @@ func (c *Cache) putMessage(m fluxer.Message) {
 		return
 	}
 	if c.messagePolicy != nil && !c.messagePolicy(c, m) {
+		c.store.Messages().Delete(m.ChannelID, m.ID)
 		return
 	}
 	if c.expired(m, time.Now()) {

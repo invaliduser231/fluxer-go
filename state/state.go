@@ -300,16 +300,18 @@ func (c *Cache) apply(e fluxer.Event) {
 		}
 	case *fluxer.GuildMemberAdd:
 		c.putMember(e.GuildID, e.Member)
-		rec := c.record(e.GuildID)
-		rec.Guild.MemberCount++
-		c.putRecord(e.GuildID, rec)
+		if rec, ok := s.Guilds().Get("", e.GuildID); ok {
+			rec.Guild.MemberCount++
+			c.putRecord(e.GuildID, rec)
+		}
 	case *fluxer.GuildMemberUpdate:
 		c.putMember(e.GuildID, e.Member)
 	case *fluxer.GuildMemberRemove:
 		s.Members().Delete(e.GuildID, e.User.ID)
-		rec := c.record(e.GuildID)
-		rec.Guild.MemberCount = max(rec.Guild.MemberCount-1, 0)
-		c.putRecord(e.GuildID, rec)
+		if rec, ok := s.Guilds().Get("", e.GuildID); ok {
+			rec.Guild.MemberCount = max(rec.Guild.MemberCount-1, 0)
+			c.putRecord(e.GuildID, rec)
+		}
 	case *fluxer.GuildMembersChunk:
 		for _, p := range e.Presences {
 			c.putPresence(e.GuildID, p)

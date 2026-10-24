@@ -98,6 +98,9 @@ func (c *Cache) VoiceMembers(guildID, channelID string) []fluxer.Member {
 // member with the lowest user ID whose name starts with name.
 func (c *Cache) FindMember(guildID, name string) (fluxer.Member, bool) {
 	name = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(name)), "@")
+	if name == "" {
+		return fluxer.Member{}, false
+	}
 	var partial fluxer.Member
 	found := false
 	for _, m := range c.Members(guildID) {
