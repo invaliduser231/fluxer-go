@@ -168,7 +168,8 @@ func (s *Session) Latency() time.Duration {
 // connection it waits with jittered backoff and reconnects, resuming when it holds a session ID.
 // Close code 4007 discards the session so the next attempt identifies. Run returns ctx.Err() once
 // ctx ends, ErrInvalidToken when a new session is closed with 4004, a *BanError when the handshake
-// reports an IP ban, and a *CloseError for close codes 4002, 4010, 4011 and 4012. Every other error
+// reports an IP ban, and a *CloseError for close codes 4001, 4002, 4003, 4005, 4010, 4011 and 4012,
+// which point at a client bug or a setting that another attempt would not fix. Every other error
 // leads to another attempt.
 func (s *Session) Run(ctx context.Context) error {
 	backoff := s.minBackoff()
@@ -190,7 +191,7 @@ func (s *Session) Run(ctx context.Context) error {
 					return ErrInvalidToken
 				}
 				s.Restore(Checkpoint{})
-			case 4002, 4010, 4011, 4012:
+			case 4001, 4002, 4003, 4005, 4010, 4011, 4012:
 				return ce
 			case 4007:
 				s.Restore(Checkpoint{})

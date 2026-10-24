@@ -321,6 +321,36 @@ func TestGatewayWaitsForHeldIdentify(t *testing.T) {
 	}
 }
 
+func TestGatewayStopsOnClientErrorClose(t *testing.T) {
+	for _, code := range []websocket.StatusCode{4001, 4003, 4005} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ws, err := websocket.Accept(w, r, nil)
+			if err != nil {
+				return
+			}
+			defer ws.CloseNow()
+			_ = ws.Write(r.Context(), websocket.MessageText, []byte(`{"op":10,"d":{"heartbeat_interval":45000}}`))
+			if _, _, err := ws.Read(r.Context()); err != nil {
+				return
+			}
+			ws.Close(code, "")
+		}))
+		s := &fluxer.Session{
+			URL:        "ws" + strings.TrimPrefix(srv.URL, "http") + "/gateway",
+			Token:      "1000.secret",
+			MinBackoff: 10 * time.Millisecond,
+			MaxBackoff: 20 * time.Millisecond,
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := s.Run(ctx)
+		cancel()
+		srv.Close()
+		if ce, ok := errors.AsType[*fluxer.CloseError](err); !ok || ce.Code != int(code) {
+			t.Errorf("close %d: got %v", code, err)
+		}
+	}
+}
+
 func TestGatewayStartsOverWhenIdentifyIsHeldTooLong(t *testing.T) {
 	srv, _ := setup(t)
 	srv.HoldNextIdentify(400 * time.Millisecond)

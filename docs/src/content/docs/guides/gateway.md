@@ -24,6 +24,7 @@ It returns early only when another attempt can't succeed:
 | `fluxer.ErrInvalidToken` | Fluxer rejected the token. |
 | `*fluxer.BanError` | The IP address is banned. `Until` says for how long. |
 | `*fluxer.CloseError` with 4002, 4010, 4011 or 4012 | The payload, shard or API version is wrong. 4011 means the bot needs more shards. |
+| `*fluxer.CloseError` with 4001, 4003 or 4005 | The session sent something Fluxer doesn't accept at that point. This is a bug, either in your code or in fluxer-go. |
 
 ## Options
 
