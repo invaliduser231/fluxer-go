@@ -169,6 +169,9 @@ func (k *Chunker) Handle(event string, data json.RawMessage) {
 		k.mu.Lock()
 		defer k.mu.Unlock()
 		for nonce, req := range k.pending {
+			if req.closed {
+				continue
+			}
 			if nonce == e.Meta["nonce"] || e.Meta["nonce"] == "" && req.guildID == e.Meta["guild_id"] {
 				req.err = &RateLimitedError{GuildID: req.guildID, RetryAfter: time.Duration(e.RetryAfter * float64(time.Second))}
 				req.finish()
