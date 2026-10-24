@@ -98,6 +98,9 @@ func TestGatewayIdentifyAndDispatch(t *testing.T) {
 	if s.Latency() <= 0 {
 		t.Error("latency not measured")
 	}
+	if u := s.User(); u.ID != "1000" || !u.Bot {
+		t.Errorf("got user %+v", u)
+	}
 	if c := s.Checkpoint(); c.SessionID == "" || c.Seq != 2 {
 		t.Errorf("got checkpoint %+v", c)
 	}

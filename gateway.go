@@ -83,6 +83,7 @@ type Session struct {
 	sessionID string
 	seq       int64
 	latency   time.Duration
+	user      User
 	live      *wire
 }
 
@@ -103,6 +104,12 @@ func (s *Session) Restore(c Checkpoint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessionID, s.seq = c.SessionID, c.Seq
+}
+
+func (s *Session) User() User {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.user
 }
 
 func (s *Session) Latency() time.Duration {
@@ -245,7 +252,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 					return false, err
 				}
 				s.mu.Lock()
-				s.sessionID = r.SessionID
+				s.sessionID, s.user = r.SessionID, r.User
 				s.mu.Unlock()
 				ready = true
 				signal(true)
