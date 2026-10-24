@@ -221,7 +221,7 @@ func TestGatewayURLFromREST(t *testing.T) {
 	}
 }
 
-func TestGatewayResendsDroppedIdentify(t *testing.T) {
+func TestGatewayStartsOverAfterDroppedIdentify(t *testing.T) {
 	srv, _ := setup(t)
 	srv.DropNextIdentify()
 	_, events, _ := start(t, srv, "1000.secret")
@@ -302,6 +302,36 @@ func TestGatewayIdentifiesWhenResumeGetsNoAnswer(t *testing.T) {
 	srv.Drop()
 	expect(t, events, "READY")
 	if st := srv.Stats(); st.Identifies != 2 || st.Resumes == 0 {
+		t.Errorf("got %+v", st)
+	}
+}
+
+func TestGatewayWaitsForHeldIdentify(t *testing.T) {
+	srv, _ := setup(t)
+	srv.HoldNextIdentify(150 * time.Millisecond)
+	_, events, done := start(t, srv, "1000.secret")
+	expect(t, events, "READY")
+	if st := srv.Stats(); st.Identifies != 1 || st.Dials != 1 {
+		t.Errorf("got %+v", st)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("Run stopped: %v", err)
+	default:
+	}
+}
+
+func TestGatewayStartsOverWhenIdentifyIsHeldTooLong(t *testing.T) {
+	srv, _ := setup(t)
+	srv.HoldNextIdentify(400 * time.Millisecond)
+	_, events, done := start(t, srv, "1000.secret")
+	expect(t, events, "READY")
+	select {
+	case err := <-done:
+		t.Fatalf("Run stopped: %v", err)
+	default:
+	}
+	if st := srv.Stats(); st.Dials < 2 {
 		t.Errorf("got %+v", st)
 	}
 }

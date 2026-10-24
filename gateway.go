@@ -102,9 +102,10 @@ type Session struct {
 	// INVALID_SESSION.
 	MinBackoff time.Duration
 	MaxBackoff time.Duration
-	// ReadyTimeout is how long the session waits for READY or RESUMED before it reconnects, 30
-	// seconds by default. A new session sends IDENTIFY once more before giving up on the
-	// connection.
+	// ReadyTimeout is how long the session waits for READY or RESUMED before it drops the
+	// connection and starts over, 65 seconds by default. Fluxer holds an IDENTIFY while it is busy
+	// and drops one over the per-IP budget without a reply for 60 seconds, so a shorter timeout
+	// gives up on identifies that would still succeed.
 	ReadyTimeout time.Duration
 	// Pacer, when set, spaces out IDENTIFY calls, for example across shards that share one identify
 	// limit. Resumes are not paced.
@@ -260,7 +261,7 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 	ready := false
 	hb := &beat{}
 	awaiting := make(chan bool)
-	go s.watchReady(ctx, conn, cancel, awaiting)
+	go s.watchReady(ctx, cancel, awaiting)
 	signal := func(isReady bool) {
 		hb.setReady(isReady)
 		select {
@@ -350,24 +351,19 @@ func (s *Session) connect(parent context.Context) (bool, error) {
 	}
 }
 
-func (s *Session) watchReady(ctx context.Context, conn *wire, cancel func(), events <-chan bool) {
+func (s *Session) watchReady(ctx context.Context, cancel func(), events <-chan bool) {
 	t := time.NewTimer(s.readyTimeout())
 	defer t.Stop()
-	waiting, resent := true, false
+	waiting := true
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case ready := <-events:
-			waiting, resent = !ready, false
+			waiting = !ready
 			t.Reset(s.readyTimeout())
 		case <-t.C:
 			if !waiting {
-				continue
-			}
-			if !resent && s.Checkpoint().SessionID == "" && s.identify(ctx, conn) == nil {
-				resent = true
-				t.Reset(s.readyTimeout())
 				continue
 			}
 			cancel()
@@ -543,5 +539,5 @@ func (s *Session) readyTimeout() time.Duration {
 	if s.ReadyTimeout > 0 {
 		return s.ReadyTimeout
 	}
-	return 30 * time.Second
+	return 65 * time.Second
 }

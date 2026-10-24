@@ -27,6 +27,7 @@ It returns early only when another attempt can't succeed:
 
 ## Options
 
+- `ReadyTimeout` is how long `Run` waits for `READY` or `RESUMED` before it starts over, 65 seconds by default. Fluxer may hold an identify for a while when it is busy, so keep it above a minute.
 - `Compress` asks for `zstd-stream` compression. It saves a lot of bandwidth for bots in big guilds and costs a little CPU.
 - `IgnoredEvents` tells Fluxer not to send those events at all. That is cheaper than dropping them yourself.
 - `Presence` is the status the session starts with.
