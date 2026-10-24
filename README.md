@@ -14,6 +14,8 @@ go get github.com/invaliduser231/fluxer-go/voice
 
 Requires Go 1.26 or newer. The API is not stable before 1.0.
 
+Guides are at [invaliduser231.github.io/fluxer-go](https://invaliduser231.github.io/fluxer-go/), the API reference is on [pkg.go.dev](https://pkg.go.dev/github.com/invaliduser231/fluxer-go).
+
 ## Packages
 
 | Package | Contents |
