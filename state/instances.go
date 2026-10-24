@@ -10,12 +10,16 @@ import (
 type Instances struct {
 	SkipMembers bool
 	OnError     func(origin, event string, err error)
+	Options     func(origin string) []Option
 
 	mu     sync.Mutex
+	opts   []Option
 	caches map[string]*Cache
 }
 
-func NewInstances() *Instances { return &Instances{caches: map[string]*Cache{}} }
+func NewInstances(opts ...Option) *Instances {
+	return &Instances{opts: opts, caches: map[string]*Cache{}}
+}
 
 func (m *Instances) For(origin string) *Cache {
 	m.mu.Lock()
@@ -25,7 +29,11 @@ func (m *Instances) For(origin string) *Cache {
 	}
 	c := m.caches[origin]
 	if c == nil {
-		c = New()
+		opts := m.opts
+		if m.Options != nil {
+			opts = append(slices.Clone(opts), m.Options(origin)...)
+		}
+		c = New(opts...)
 		c.SkipMembers = m.SkipMembers
 		if m.OnError != nil {
 			c.OnError = func(event string, err error) { m.OnError(origin, event, err) }

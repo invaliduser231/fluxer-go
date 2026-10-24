@@ -26,3 +26,22 @@ func TestInstancesKeepIDsApart(t *testing.T) {
 		t.Error("dropped cache kept its data")
 	}
 }
+
+func TestInstancesApplyOptions(t *testing.T) {
+	m := state.NewInstances(state.WithMessages(5, 0))
+	m.Options = func(origin string) []state.Option {
+		if origin == "https://quiet.example" {
+			return []state.Option{state.WithoutFlags(state.FlagMessages)}
+		}
+		return nil
+	}
+	msg := json.RawMessage(`{"id":"1","channel_id":"2","content":"x","author":{"id":"7","username":"anna"}}`)
+	m.Handler("https://a.example")("MESSAGE_CREATE", msg)
+	m.Handler("https://quiet.example")("MESSAGE_CREATE", msg)
+	if _, ok := m.For("https://a.example").Message("2", "1"); !ok {
+		t.Error("message not cached")
+	}
+	if _, ok := m.For("https://quiet.example").Message("2", "1"); ok {
+		t.Error("per instance option ignored")
+	}
+}
