@@ -137,3 +137,32 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 		time.Sleep(5 * time.Millisecond)
 	}
 }
+
+func TestWaitGuildsCalledBeforeReady(t *testing.T) {
+	c := state.New()
+	done := make(chan error, 1)
+	go func() { done <- c.WaitGuilds(context.Background()) }()
+	time.Sleep(20 * time.Millisecond)
+	c.Handle("READY", json.RawMessage(`{"user":{"id":"1000"},"guilds":[{"id":"3","unavailable":true}]}`))
+	c.Handle("GUILD_CREATE", json.RawMessage(guildCreate))
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("WaitGuilds kept waiting")
+	}
+}
+
+func TestChunkerIgnoresExtraChunks(t *testing.T) {
+	r := &silentRequester{}
+	k := state.NewChunker(r)
+	go func() { _, _ = k.RequestAll(context.Background(), "3") }()
+	waitFor(t, "request", func() bool { return r.count() == 1 })
+	for _, i := range []int{0, 1} {
+		chunk, _ := json.Marshal(fluxer.GuildMembersChunk{GuildID: "3", Nonce: r.nonce(0), ChunkIndex: i, ChunkCount: 1})
+		k.Handle("GUILD_MEMBERS_CHUNK", chunk)
+	}
+	k.Handle("RATE_LIMITED", json.RawMessage(`{"opcode":8,"retry_after":1,"meta":{"guild_id":"3"}}`))
+}

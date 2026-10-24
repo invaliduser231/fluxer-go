@@ -65,6 +65,14 @@ type chunkRequest struct {
 	count     int
 	err       error
 	done      chan struct{}
+	closed    bool
+}
+
+func (r *chunkRequest) finish() {
+	if !r.closed {
+		close(r.done)
+		r.closed = true
+	}
 }
 
 // NewChunker returns a chunker that sends requests through r.
@@ -151,7 +159,7 @@ func (k *Chunker) Handle(event string, data json.RawMessage) {
 		}
 		req.presences = append(req.presences, e.Presences...)
 		if len(req.seen) >= req.count {
-			close(req.done)
+			req.finish()
 		}
 	case "RATE_LIMITED":
 		var e fluxer.RateLimited
@@ -163,7 +171,7 @@ func (k *Chunker) Handle(event string, data json.RawMessage) {
 		for nonce, req := range k.pending {
 			if nonce == e.Meta["nonce"] || e.Meta["nonce"] == "" && req.guildID == e.Meta["guild_id"] {
 				req.err = &RateLimitedError{GuildID: req.guildID, RetryAfter: time.Duration(e.RetryAfter * float64(time.Second))}
-				close(req.done)
+				req.finish()
 				delete(k.pending, nonce)
 			}
 		}
@@ -190,6 +198,7 @@ type readyState struct {
 	mu      sync.Mutex
 	pending map[string]bool
 	done    chan struct{}
+	closed  bool
 }
 
 func (r *readyState) start(guilds []fluxer.UnavailableGuild) {
@@ -199,9 +208,18 @@ func (r *readyState) start(guilds []fluxer.UnavailableGuild) {
 	for _, g := range guilds {
 		r.pending[g.ID] = true
 	}
-	r.done = make(chan struct{})
+	if r.done == nil || r.closed {
+		r.done, r.closed = make(chan struct{}), false
+	}
 	if len(r.pending) == 0 {
+		r.finish()
+	}
+}
+
+func (r *readyState) finish() {
+	if !r.closed {
 		close(r.done)
+		r.closed = true
 	}
 }
 
@@ -213,7 +231,7 @@ func (r *readyState) resolve(id string) {
 	}
 	delete(r.pending, id)
 	if len(r.pending) == 0 {
-		close(r.done)
+		r.finish()
 	}
 }
 
