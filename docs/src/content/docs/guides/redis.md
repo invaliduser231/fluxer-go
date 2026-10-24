@@ -28,7 +28,9 @@ Everything else works as with the memory store. Policies and flags are applied b
 
 ## Keys
 
-Each table is a set of hashes under the prefix, one hash per guild or channel: `mybot:members:g:<guild id>`, `mybot:messages:g:<channel id>` and so on. Values are JSON. Pick a prefix per bot, and per instance if the bot runs on several Fluxer instances.
+Each table is a set of hashes under the prefix, one hash per guild or channel: `{mybot:members}:g:<guild id>`, `{mybot:messages}:g:<channel id>` and so on. Values are JSON. Pick a prefix per bot, and per instance if the bot runs on several Fluxer instances.
+
+The part in braces is a Redis Cluster hash tag. All keys of one table land in the same slot, so the multi-key transactions the store uses work on a cluster too. Different tables spread across slots.
 
 `store.Flush(ctx)` deletes everything under the prefix. It uses `SCAN`, which on a Redis Cluster only reaches the node the client talks to.
 

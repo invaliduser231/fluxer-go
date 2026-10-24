@@ -106,9 +106,10 @@ func newTable[V any](s *Store, name string, indexed bool) *table[V] {
 	return &table[V]{s: s, name: name, indexed: indexed}
 }
 
-func (t *table[V]) groupKey(group string) string { return t.s.prefix + ":" + t.name + ":g:" + group }
-func (t *table[V]) groupsKey() string            { return t.s.prefix + ":" + t.name + ":groups" }
-func (t *table[V]) indexKey() string             { return t.s.prefix + ":" + t.name + ":idx" }
+func (t *table[V]) base() string                 { return "{" + t.s.prefix + ":" + t.name + "}" }
+func (t *table[V]) groupKey(group string) string { return t.base() + ":g:" + group }
+func (t *table[V]) groupsKey() string            { return t.base() + ":groups" }
+func (t *table[V]) indexKey() string             { return t.base() + ":idx" }
 
 func (t *table[V]) Get(group, key string) (V, bool) {
 	var v V
@@ -259,7 +260,7 @@ func (t *table[V]) Locate(key string) (string, bool) {
 func (s *Store) Flush(ctx context.Context) error {
 	var cursor uint64
 	for {
-		keys, next, err := s.client.Scan(ctx, cursor, s.prefix+":*", 500).Result()
+		keys, next, err := s.client.Scan(ctx, cursor, "{"+s.prefix+":*", 500).Result()
 		if err != nil {
 			return err
 		}
