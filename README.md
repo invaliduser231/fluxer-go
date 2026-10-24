@@ -19,7 +19,8 @@ Requires Go 1.26 or newer. The API is not stable before 1.0.
 | Package | Contents |
 | --- | --- |
 | `fluxer` | REST client, gateway session, sharding, events, router, permissions, OAuth2 |
-| `fluxer/state` | In-memory cache of guilds, channels, roles, members and voice states, fed by gateway events |
+| `fluxer/state` | Cache fed by gateway events, with policies, old values, a message cache, member chunking and REST fallback |
+| `fluxer/state/redis` | Redis storage for the cache |
 | `fluxer/fluxertest` | Fake Fluxer server with REST routes and a gateway for tests |
 | `fluxer/voice` | Joining voice channels, playing Ogg Opus, publishing and receiving tracks |
 
@@ -64,6 +65,12 @@ for m, err := range client.MessagesBefore(ctx, channelID, "") {
 	}
 	fmt.Println(m.Author.Tag(), m.Content)
 }
+```
+
+Files above a few megabytes go through presigned uploads, which send the bytes straight to storage and split large files into parts:
+
+```go
+_, err = client.SendMessageUploads(ctx, channelID, fluxer.MessageSend{Content: "Recording"}, []fluxer.File{{Name: "call.mp4", Data: video}})
 ```
 
 Edits use pointer fields, so only the fields you set are sent:
@@ -124,7 +131,76 @@ if perms.Has(fluxer.PermSendMessages | fluxer.PermEmbedLinks) {
 }
 ```
 
-Bots receive only a few members with each guild. Use `Session.RequestGuildMembers` or `Client.AllMembers` to fill the cache, or set `cache.SkipMembers` to keep only the bot's own member. `fluxer.ChannelPermissions` computes permissions from a guild, roles and a channel without the cache.
+The cache keeps guilds, channels, threads, roles, members, users, presences, voice states, emojis, stickers and the last messages of each channel. Every entity can be switched off, and members, channels and messages can be filtered with policies:
+
+```go
+cache := state.New(
+	state.WithoutFlags(state.FlagPresences),
+	state.WithMemberPolicy(state.MembersInVoice().Or(state.MemberOwner())),
+	state.WithChannelPolicy(state.ChannelTypes(fluxer.ChannelText, fluxer.ChannelVoice)),
+	state.WithMessages(200, time.Hour),
+	state.WithMessagePolicy(state.MessagesFromHumans()),
+)
+```
+
+The bot's own member is always kept. A member that stops matching its policy, for example by leaving voice, is dropped. `SweepMembers` and `SweepMessages` apply the policies and the message TTL to everything already stored.
+
+Members from the guild burst after READY carry only a user ID. The cache fills them from the users it has seen, and `MemberPartial` reports the ones it could not complete.
+
+Handlers that need the state before an update register with `state.OnChange`:
+
+```go
+state.OnChange(cache, func(old *fluxer.Message, e *fluxer.MessageUpdate) {
+	if old != nil && old.Content != e.Content {
+		log.Printf("edited: %q -> %q", old.Content, e.Content)
+	}
+})
+state.OnChange(cache, func(old *fluxer.Member, e *fluxer.GuildMemberRemove) {
+	if old != nil {
+		log.Printf("%s left", old.DisplayName())
+	}
+})
+```
+
+`Chunker` requests members and waits until every chunk has arrived. With a filter it loads the members of each guild as it becomes available. `WaitGuilds` blocks until all guilds from READY have arrived.
+
+```go
+chunker := state.NewChunker(session)
+chunker.Filter = state.ChunkGuilds(mainGuildID)
+session.Handler = func(event string, data json.RawMessage) {
+	cache.Handle(event, data)
+	chunker.Handle(event, data)
+	router.Handle(event, data)
+}
+members, err := chunker.Request(ctx, fluxer.RequestMembers{GuildID: guildID, Query: "ann", Limit: 10})
+```
+
+`Resolver` reads from the cache and falls back to REST. Parallel lookups of the same entity share one request, and the result is written back.
+
+```go
+resolver := state.NewResolver(cache, client)
+member, err := resolver.Member(ctx, guildID, userID)
+perms, err := resolver.Permissions(ctx, guildID, channelID, userID)
+```
+
+There are also helpers for the role hierarchy (`HighestRole`, `CanManageMember`, `CanManageRole`), name lookups (`FindMember`, `RoleByName`, `ChannelByName`, `EmojiByName`), voice (`VoiceMembers`, `VoiceChannel`), message history (`Messages` with before and after), iterators (`EachGuild`, `EachMember`, `EachMessage`) and `Stats`.
+
+`fluxer.ChannelPermissions` computes permissions from a guild, roles and a channel without the cache.
+
+### Redis
+
+The storage behind the cache is an interface. `state/redis` keeps it in Redis, so several processes or shards can share one cache:
+
+```
+go get github.com/invaliduser231/fluxer-go/state/redis
+```
+
+```go
+client := goredis.NewClient(&goredis.Options{Addr: "localhost:6379"})
+store := redis.New(client, "mybot")
+store.OnError = func(err error) { log.Print(err) }
+cache := state.New(state.WithStore(store))
+```
 
 ## Gateway options
 
@@ -141,7 +217,7 @@ session := &fluxer.Session{
 
 `Compress` negotiates `zstd-stream` compression. `IgnoredEvents` asks Fluxer not to send those dispatches at all. Commands such as `UpdateStatus`, `RequestGuildMembers`, `RequestGuildCounts` and `UpdateVoiceState` are methods on the session.
 
-`Checkpoint` and `Restore` carry a session ID and sequence across a process restart, so a new process can resume within the 60 seconds Fluxer keeps a session.
+`Session.User` returns the bot user from the last READY. `Checkpoint` and `Restore` carry a session ID and sequence across a process restart, so a new process can resume within the 60 seconds Fluxer keeps a session.
 
 ## Sharding
 
@@ -186,7 +262,7 @@ if err := cmd.Start(); err != nil {
 err = conn.Play(ctx, out)
 ```
 
-`conn.OpusTrack` publishes a track that takes Opus frames directly, and `voice.Options.OnTrack` receives the tracks of other participants. `Move`, `SetMute` and `SetDeaf` change the connection without leaving. A refused join returns a `*fluxer.GatewayError`, for example with the code `fluxer.VoiceChannelFull`.
+`conn.OpusTrack` publishes a track that takes Opus frames directly, `voice.Options.OnTrack` receives the tracks of other participants and `voice.Options.OnDisconnect` reports a dropped media connection. `Move`, `SetMute` and `SetDeaf` change the connection without leaving. A refused join returns a `*fluxer.GatewayError`, for example with the code `fluxer.VoiceChannelFull`.
 
 See [voice/examples/play](voice/examples/play).
 
@@ -219,15 +295,37 @@ user, err := o.User(ctx, token.AccessToken)
 
 `fluxer.BotInviteURL` builds the link that adds a bot to a guild with a set of permissions.
 
-## Other instances
+GitHub, Slack, Instatus and Libredesk payloads can be forwarded to a webhook with `ExecuteGitHubWebhook`, `ExecuteSlackWebhook`, `ExecuteInstatusWebhook` and `ExecuteLibredeskWebhook`.
+
+## Instances
 
 Fluxer can be self-hosted. `fluxer.Discover` reads the discovery document of an instance and returns its endpoints.
 
 ```go
 inst, err := fluxer.Discover(ctx, "https://chat.example.org")
 client := inst.NewClient(token)
-session := &fluxer.Session{URL: inst.Gateway, Token: token, Handler: router.Handle}
+session := inst.NewSession(token)
 ```
+
+A bot that runs on several instances at once keeps a `fluxer.Instances` registry. It caches the discovery documents, keeps serving the last good document when an instance is briefly unreachable and paces identifies per instance. IDs are only unique within one instance, so `state.Instances` keeps one cache per origin. Its `Options` function gives each instance its own settings, for example a Redis prefix.
+
+```go
+instances := fluxer.NewInstances()
+caches := state.NewInstances()
+
+for origin, token := range tokens {
+	client, err := instances.Client(ctx, origin, token)
+	session, err := instances.Session(ctx, origin, token)
+	cache := caches.For(origin)
+	session.Handler = func(event string, data json.RawMessage) {
+		cache.Handle(event, data)
+		handle(origin, client, event, data)
+	}
+	go session.Run(ctx)
+}
+```
+
+See [examples/multi](examples/multi).
 
 ## Testing
 
