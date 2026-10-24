@@ -17,6 +17,7 @@ import (
 
 type fakeRoom struct {
 	mu           sync.Mutex
+	cb           *lksdk.RoomCallback
 	endpoint     string
 	token        string
 	published    []string
@@ -50,7 +51,7 @@ type rooms struct {
 func (rs *rooms) connect(ctx context.Context, endpoint, token string, cb *lksdk.RoomCallback, receive bool) (voice.Room, error) {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	r := &fakeRoom{endpoint: endpoint, token: token}
+	r := &fakeRoom{cb: cb, endpoint: endpoint, token: token}
 	rs.all = append(rs.all, r)
 	return r, nil
 }
@@ -167,6 +168,31 @@ func TestPlayPublishesAndStops(t *testing.T) {
 	}
 	if err := stop(); err != nil || room.unpublished != 2 {
 		t.Errorf("got %v, %d", err, room.unpublished)
+	}
+}
+
+func TestDroppedRoomIsReported(t *testing.T) {
+	_, m, rs := setup(t)
+	var mu sync.Mutex
+	var reasons []string
+	c, err := m.Join(context.Background(), "3", "31", voice.Options{OnDisconnect: func(reason string) {
+		mu.Lock()
+		reasons = append(reasons, reason)
+		mu.Unlock()
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := rs.last()
+	if err := c.Move(context.Background(), "32"); err != nil {
+		t.Fatal(err)
+	}
+	first.cb.OnDisconnectedWithReason(lksdk.LeaveRequested)
+	rs.last().cb.OnDisconnectedWithReason(lksdk.RoomClosed)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reasons) != 1 || reasons[0] != string(lksdk.RoomClosed) {
+		t.Errorf("got %q", reasons)
 	}
 }
 

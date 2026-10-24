@@ -24,6 +24,7 @@ type Conn struct {
 	selfMute     bool
 	selfDeaf     bool
 	closed       bool
+	gen          int
 	moved        chan *fluxer.VoiceServerUpdate
 }
 
@@ -48,6 +49,10 @@ func (c *Conn) Room() Room {
 }
 
 func (c *Conn) connect(ctx context.Context, grant *fluxer.VoiceServerUpdate) error {
+	c.mu.Lock()
+	c.gen++
+	gen := c.gen
+	c.mu.Unlock()
 	cb := lksdk.NewRoomCallback()
 	if c.opts.OnTrack != nil {
 		cb.OnTrackSubscribed = func(track *webrtc.TrackRemote, _ *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
@@ -56,7 +61,7 @@ func (c *Conn) connect(ctx context.Context, grant *fluxer.VoiceServerUpdate) err
 			}
 		}
 	}
-	cb.OnDisconnected = func() {}
+	cb.OnDisconnectedWithReason = func(reason lksdk.DisconnectionReason) { c.dropped(gen, string(reason)) }
 	connect := c.m.Connect
 	if connect == nil {
 		connect = connectLiveKit
@@ -74,6 +79,15 @@ func (c *Conn) connect(ctx context.Context, grant *fluxer.VoiceServerUpdate) err
 		old.Disconnect()
 	}
 	return nil
+}
+
+func (c *Conn) dropped(gen int, reason string) {
+	c.mu.Lock()
+	current := !c.closed && c.gen == gen
+	c.mu.Unlock()
+	if current && c.opts.OnDisconnect != nil {
+		c.opts.OnDisconnect(reason)
+	}
 }
 
 func (c *Conn) regrant(grant *fluxer.VoiceServerUpdate) {

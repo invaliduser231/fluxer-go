@@ -30,9 +30,10 @@ type Room interface {
 type Connector func(ctx context.Context, endpoint, token string, cb *lksdk.RoomCallback, receive bool) (Room, error)
 
 type Options struct {
-	SelfMute bool
-	SelfDeaf bool
-	OnTrack  func(userID string, track *webrtc.TrackRemote)
+	SelfMute     bool
+	SelfDeaf     bool
+	OnTrack      func(userID string, track *webrtc.TrackRemote)
+	OnDisconnect func(reason string)
 }
 
 type Manager struct {
