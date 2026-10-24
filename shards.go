@@ -8,19 +8,32 @@ import (
 	"sync"
 )
 
+// Shards runs one Session per shard with a shared identify Pacer.
 type Shards struct {
-	URL       string
-	Token     string
-	Count     int
-	Client    *Client
-	Handler   func(shard int, event string, data json.RawMessage)
+	// URL is the gateway URL for every shard.
+	URL   string
+	Token string
+	// Count is the number of shards. When Count is zero or URL is empty, Run fetches
+	// Client.GatewayBot and fills in what is missing, with at least one shard.
+	Count int
+	// Client is only needed when Count or URL is unset.
+	Client *Client
+	// Handler receives the dispatches of all shards together with the shard ID. It runs on the
+	// gateway read goroutine of that shard.
+	Handler func(shard int, event string, data json.RawMessage)
+	// Configure is called for each Session before it starts, for options such as Compress or
+	// IgnoredEvents. It may also replace the Handler and Pacer set by Shards.
 	Configure func(s *Session)
-	Pacer     *Pacer
+	// Pacer spaces out identifies across all shards. Nil uses NewPacer(60).
+	Pacer *Pacer
 
 	mu       sync.Mutex
 	sessions []*Session
 }
 
+// Run starts every shard and blocks until ctx ends or a shard's Session.Run returns an error. That
+// error stops the other shards and is returned. Without Count and URL, Run fails if Client is nil
+// or GatewayBot fails.
 func (m *Shards) Run(ctx context.Context) error {
 	count := m.Count
 	url := m.URL
@@ -75,12 +88,15 @@ func (m *Shards) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// Sessions returns a copy of the shard sessions indexed by shard ID. It is empty until Run has
+// started.
 func (m *Shards) Sessions() []*Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]*Session(nil), m.sessions...)
 }
 
+// ForGuild returns the session of the shard that owns guildID, or nil before Run has started.
 func (m *Shards) ForGuild(guildID string) *Session {
 	m.mu.Lock()
 	defer m.mu.Unlock()

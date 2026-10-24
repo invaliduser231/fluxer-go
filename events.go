@@ -5,19 +5,24 @@ import (
 	"time"
 )
 
+// Event is implemented by every typed dispatch. EventName returns the dispatch name, such as
+// MESSAGE_CREATE.
 type Event interface{ EventName() string }
 
+// UnavailableGuild is a guild entry in READY. The full guild follows as GUILD_CREATE.
 type UnavailableGuild struct {
 	ID          string `json:"id"`
 	Unavailable bool   `json:"unavailable"`
 }
 
+// RTCRegion is a voice region listed in READY.
 type RTCRegion struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Emoji string `json:"emoji"`
 }
 
+// Ready is the READY dispatch. Session keeps SessionID for resuming and User for Session.User.
 type Ready struct {
 	SessionID       string             `json:"session_id"`
 	Version         int                `json:"version"`
@@ -29,8 +34,11 @@ type Ready struct {
 	Shard           []int              `json:"shard,omitempty"`
 }
 
+// Resumed is the RESUMED dispatch. It carries no data.
 type Resumed struct{}
 
+// GuildState is the full guild payload of GUILD_CREATE and GUILD_SYNC. The guild settings are in
+// Properties, the collections sit next to it.
 type GuildState struct {
 	ID          string       `json:"id"`
 	Properties  Guild        `json:"properties"`
@@ -47,6 +55,8 @@ type GuildState struct {
 	Threads     []Channel    `json:"threads,omitempty"`
 }
 
+// Guild combines Properties with the ID, roles, channels, emojis, stickers and counts. Members,
+// voice states and threads are not included.
 func (g GuildState) Guild() Guild {
 	out := g.Properties
 	out.ID = g.ID
@@ -55,94 +65,119 @@ func (g GuildState) Guild() Guild {
 	return out
 }
 
+// GuildCreate is the GUILD_CREATE dispatch. For bot sessions, members in the guilds sent after
+// READY carry only the user ID.
 type GuildCreate struct{ GuildState }
 
+// GuildSync is the GUILD_SYNC dispatch.
 type GuildSync struct{ GuildState }
 
+// GuildUpdate is the GUILD_UPDATE dispatch.
 type GuildUpdate struct{ Guild }
 
+// GuildDelete is the GUILD_DELETE dispatch. Unavailable is set when the guild is down; without it
+// the bot left or was removed.
 type GuildDelete struct {
 	ID          string `json:"id"`
 	Unavailable bool   `json:"unavailable,omitempty"`
 }
 
+// GuildRoleCreate is the GUILD_ROLE_CREATE dispatch.
 type GuildRoleCreate struct {
 	GuildID string `json:"guild_id"`
 	Role    Role   `json:"role"`
 }
 
+// GuildRoleUpdate is the GUILD_ROLE_UPDATE dispatch.
 type GuildRoleUpdate struct {
 	GuildID string `json:"guild_id"`
 	Role    Role   `json:"role"`
 }
 
+// GuildRoleUpdateBulk is the GUILD_ROLE_UPDATE_BULK dispatch.
 type GuildRoleUpdateBulk struct {
 	GuildID string `json:"guild_id"`
 	Roles   []Role `json:"roles"`
 }
 
+// GuildRoleDelete is the GUILD_ROLE_DELETE dispatch.
 type GuildRoleDelete struct {
 	GuildID string `json:"guild_id"`
 	RoleID  string `json:"role_id"`
 }
 
+// GuildEmojisUpdate is the GUILD_EMOJIS_UPDATE dispatch.
 type GuildEmojisUpdate struct {
 	GuildID string  `json:"guild_id"`
 	Emojis  []Emoji `json:"emojis"`
 }
 
+// GuildStickersUpdate is the GUILD_STICKERS_UPDATE dispatch.
 type GuildStickersUpdate struct {
 	GuildID  string    `json:"guild_id"`
 	Stickers []Sticker `json:"stickers"`
 }
 
+// ChannelCreate is the CHANNEL_CREATE dispatch.
 type ChannelCreate struct{ Channel }
 
+// ChannelUpdate is the CHANNEL_UPDATE dispatch.
 type ChannelUpdate struct{ Channel }
 
+// ChannelUpdateBulk is the CHANNEL_UPDATE_BULK dispatch.
 type ChannelUpdateBulk struct {
 	GuildID  string    `json:"guild_id"`
 	Channels []Channel `json:"channels"`
 }
 
+// ChannelDelete is the CHANNEL_DELETE dispatch.
 type ChannelDelete struct{ Channel }
 
+// ChannelRecipientAdd is the CHANNEL_RECIPIENT_ADD dispatch.
 type ChannelRecipientAdd struct {
 	ChannelID string `json:"channel_id"`
 	User      User   `json:"user"`
 }
 
+// ChannelRecipientRemove is the CHANNEL_RECIPIENT_REMOVE dispatch.
 type ChannelRecipientRemove struct {
 	ChannelID string `json:"channel_id"`
 	User      User   `json:"user"`
 }
 
+// ChannelPinsUpdate is the CHANNEL_PINS_UPDATE dispatch.
 type ChannelPinsUpdate struct {
 	ChannelID        string     `json:"channel_id"`
 	GuildID          string     `json:"guild_id,omitempty"`
 	LastPinTimestamp *time.Time `json:"last_pin_timestamp"`
 }
 
+// WebhooksUpdate is the WEBHOOKS_UPDATE dispatch.
 type WebhooksUpdate struct {
 	GuildID   string `json:"guild_id"`
 	ChannelID string `json:"channel_id"`
 }
 
+// InviteCreate is the INVITE_CREATE dispatch.
 type InviteCreate struct{ Invite }
 
+// InviteDelete is the INVITE_DELETE dispatch.
 type InviteDelete struct {
 	Code      string `json:"code"`
 	ChannelID string `json:"channel_id,omitempty"`
 	GuildID   string `json:"guild_id,omitempty"`
 }
 
+// ThreadCreate is the THREAD_CREATE dispatch.
 type ThreadCreate struct {
 	Channel
 	NewlyCreated bool `json:"newly_created,omitempty"`
 }
 
+// ThreadUpdate is the THREAD_UPDATE dispatch.
 type ThreadUpdate struct{ Channel }
 
+// ThreadDelete is the THREAD_DELETE dispatch.
 type ThreadDelete struct {
 	ID       string `json:"id"`
 	GuildID  string `json:"guild_id"`
@@ -150,6 +185,7 @@ type ThreadDelete struct {
 	Type     int    `json:"type"`
 }
 
+// ThreadListSync is the THREAD_LIST_SYNC dispatch.
 type ThreadListSync struct {
 	GuildID    string         `json:"guild_id"`
 	ChannelIDs []string       `json:"channel_ids,omitempty"`
@@ -157,11 +193,13 @@ type ThreadListSync struct {
 	Members    []ThreadMember `json:"members"`
 }
 
+// ThreadMemberUpdate is the THREAD_MEMBER_UPDATE dispatch.
 type ThreadMemberUpdate struct {
 	ThreadMember
 	GuildID string `json:"guild_id"`
 }
 
+// ThreadMembersUpdate is the THREAD_MEMBERS_UPDATE dispatch.
 type ThreadMembersUpdate struct {
 	ID               string         `json:"id"`
 	GuildID          string         `json:"guild_id"`
@@ -170,15 +208,20 @@ type ThreadMembersUpdate struct {
 	RemovedMemberIDs []string       `json:"removed_member_ids,omitempty"`
 }
 
+// GuildMemberAdd is the GUILD_MEMBER_ADD dispatch.
 type GuildMemberAdd struct{ Member }
 
+// GuildMemberUpdate is the GUILD_MEMBER_UPDATE dispatch.
 type GuildMemberUpdate struct{ Member }
 
+// GuildMemberRemove is the GUILD_MEMBER_REMOVE dispatch.
 type GuildMemberRemove struct {
 	GuildID string `json:"guild_id"`
 	User    User   `json:"user"`
 }
 
+// GuildMembersChunk is the GUILD_MEMBERS_CHUNK dispatch, one part of the answer to
+// Session.RequestGuildMembers.
 type GuildMembersChunk struct {
 	GuildID    string     `json:"guild_id"`
 	Members    []Member   `json:"members"`
@@ -188,16 +231,19 @@ type GuildMembersChunk struct {
 	Nonce      string     `json:"nonce,omitempty"`
 }
 
+// GuildBanAdd is the GUILD_BAN_ADD dispatch.
 type GuildBanAdd struct {
 	GuildID string `json:"guild_id"`
 	User    User   `json:"user"`
 }
 
+// GuildBanRemove is the GUILD_BAN_REMOVE dispatch.
 type GuildBanRemove struct {
 	GuildID string `json:"guild_id"`
 	User    User   `json:"user"`
 }
 
+// CustomStatus is the custom status text and emoji of a presence.
 type CustomStatus struct {
 	Text          *string    `json:"text,omitempty"`
 	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
@@ -206,6 +252,7 @@ type CustomStatus struct {
 	EmojiAnimated bool       `json:"emoji_animated,omitempty"`
 }
 
+// Presence is the status of one user.
 type Presence struct {
 	User         User          `json:"user"`
 	Status       string        `json:"status"`
@@ -215,27 +262,33 @@ type Presence struct {
 	GuildID      string        `json:"guild_id,omitempty"`
 }
 
+// PresenceUpdate is the PRESENCE_UPDATE dispatch.
 type PresenceUpdate struct{ Presence }
 
+// PresenceUpdateBulk is the PRESENCE_UPDATE_BULK dispatch.
 type PresenceUpdateBulk struct {
 	GuildID   string     `json:"guild_id"`
 	Presences []Presence `json:"presences"`
 }
 
+// PassiveUpdates is the PASSIVE_UPDATES dispatch.
 type PassiveUpdates struct {
 	GuildID     string            `json:"guild_id"`
 	Channels    map[string]string `json:"channels"`
 	VoiceStates []VoiceState      `json:"voice_states,omitempty"`
 }
 
+// MessageCreate is the MESSAGE_CREATE dispatch.
 type MessageCreate struct {
 	Message
 	ChannelType int  `json:"channel_type"`
 	MentionHere bool `json:"mention_here,omitempty"`
 }
 
+// MessageUpdate is the MESSAGE_UPDATE dispatch.
 type MessageUpdate struct{ Message }
 
+// MessageDelete is the MESSAGE_DELETE dispatch.
 type MessageDelete struct {
 	ID        string  `json:"id"`
 	ChannelID string  `json:"channel_id"`
@@ -245,12 +298,14 @@ type MessageDelete struct {
 	Member    *Member `json:"member,omitempty"`
 }
 
+// MessageDeleteBulk is the MESSAGE_DELETE_BULK dispatch.
 type MessageDeleteBulk struct {
 	IDs       []string `json:"ids"`
 	ChannelID string   `json:"channel_id"`
 	GuildID   string   `json:"guild_id,omitempty"`
 }
 
+// MessageReactionAdd is the MESSAGE_REACTION_ADD dispatch.
 type MessageReactionAdd struct {
 	UserID    string        `json:"user_id"`
 	ChannelID string        `json:"channel_id"`
@@ -260,12 +315,14 @@ type MessageReactionAdd struct {
 	Member    *Member       `json:"member,omitempty"`
 }
 
+// ReactionAddition is one reaction in MESSAGE_REACTION_ADD_MANY.
 type ReactionAddition struct {
 	UserID string        `json:"user_id"`
 	Emoji  ReactionEmoji `json:"emoji"`
 	Member *Member       `json:"member,omitempty"`
 }
 
+// MessageReactionAddMany is the MESSAGE_REACTION_ADD_MANY dispatch.
 type MessageReactionAddMany struct {
 	ChannelID string             `json:"channel_id"`
 	MessageID string             `json:"message_id"`
@@ -273,6 +330,7 @@ type MessageReactionAddMany struct {
 	Reactions []ReactionAddition `json:"reactions"`
 }
 
+// MessageReactionRemove is the MESSAGE_REACTION_REMOVE dispatch.
 type MessageReactionRemove struct {
 	UserID    string        `json:"user_id"`
 	ChannelID string        `json:"channel_id"`
@@ -281,12 +339,14 @@ type MessageReactionRemove struct {
 	Emoji     ReactionEmoji `json:"emoji"`
 }
 
+// MessageReactionRemoveAll is the MESSAGE_REACTION_REMOVE_ALL dispatch.
 type MessageReactionRemoveAll struct {
 	ChannelID string `json:"channel_id"`
 	MessageID string `json:"message_id"`
 	GuildID   string `json:"guild_id,omitempty"`
 }
 
+// MessageReactionRemoveEmoji is the MESSAGE_REACTION_REMOVE_EMOJI dispatch.
 type MessageReactionRemoveEmoji struct {
 	ChannelID string        `json:"channel_id"`
 	MessageID string        `json:"message_id"`
@@ -294,6 +354,7 @@ type MessageReactionRemoveEmoji struct {
 	Emoji     ReactionEmoji `json:"emoji"`
 }
 
+// TypingStart is the TYPING_START dispatch.
 type TypingStart struct {
 	ChannelID string  `json:"channel_id"`
 	UserID    string  `json:"user_id"`
@@ -302,6 +363,7 @@ type TypingStart struct {
 	Member    *Member `json:"member,omitempty"`
 }
 
+// VoiceState is the voice connection state of one user.
 type VoiceState struct {
 	GuildID          string   `json:"guild_id,omitempty"`
 	ChannelID        string   `json:"channel_id,omitempty"`
@@ -321,8 +383,11 @@ type VoiceState struct {
 	Version          int64    `json:"version"`
 }
 
+// VoiceStateUpdate is the VOICE_STATE_UPDATE dispatch.
 type VoiceStateUpdate struct{ VoiceState }
 
+// VoiceServerUpdate is the VOICE_SERVER_UPDATE dispatch with the endpoint and token for a voice
+// connection.
 type VoiceServerUpdate struct {
 	Token        string `json:"token"`
 	Endpoint     string `json:"endpoint"`
@@ -332,6 +397,7 @@ type VoiceServerUpdate struct {
 	E2EEKey      string `json:"e2ee_key,omitempty"`
 }
 
+// EntranceSoundPlay is the ENTRANCE_SOUND_PLAY dispatch.
 type EntranceSoundPlay struct {
 	UserID      string `json:"user_id"`
 	ChannelID   string `json:"channel_id"`
@@ -343,6 +409,7 @@ type EntranceSoundPlay struct {
 	ContentType string `json:"content_type"`
 }
 
+// Call is the state of a call in a private channel, shared by CALL_CREATE and CALL_UPDATE.
 type Call struct {
 	ChannelID   string       `json:"channel_id"`
 	MessageID   string       `json:"message_id"`
@@ -351,29 +418,35 @@ type Call struct {
 	VoiceStates []VoiceState `json:"voice_states"`
 }
 
+// CallCreate is the CALL_CREATE dispatch.
 type CallCreate struct {
 	Call
 	Recipients []string `json:"recipients,omitempty"`
 }
 
+// CallUpdate is the CALL_UPDATE dispatch.
 type CallUpdate struct{ Call }
 
+// CallDelete is the CALL_DELETE dispatch.
 type CallDelete struct {
 	ChannelID   string `json:"channel_id"`
 	Unavailable bool   `json:"unavailable,omitempty"`
 }
 
+// GuildCount holds the member and online count of one guild.
 type GuildCount struct {
 	GuildID     string `json:"guild_id"`
 	MemberCount int    `json:"member_count"`
 	OnlineCount int    `json:"online_count"`
 }
 
+// GuildCountsUpdate is the GUILD_COUNTS_UPDATE dispatch, the answer to Session.RequestGuildCounts.
 type GuildCountsUpdate struct {
 	Counts []GuildCount `json:"counts"`
 	Nonce  string       `json:"nonce,omitempty"`
 }
 
+// ChannelMemberCount holds the member and online count of one channel.
 type ChannelMemberCount struct {
 	GuildID     string `json:"guild_id"`
 	ChannelID   string `json:"channel_id"`
@@ -381,17 +454,21 @@ type ChannelMemberCount struct {
 	OnlineCount int    `json:"online_count"`
 }
 
+// ChannelMemberCountsUpdate is the CHANNEL_MEMBER_COUNTS_UPDATE dispatch, the answer to
+// Session.RequestChannelMemberCounts.
 type ChannelMemberCountsUpdate struct {
 	Counts []ChannelMemberCount `json:"counts"`
 	Nonce  string               `json:"nonce,omitempty"`
 }
 
+// RateLimited is the RATE_LIMITED dispatch. Opcode is the gateway command that hit the limit.
 type RateLimited struct {
 	Opcode     int               `json:"opcode"`
 	RetryAfter float64           `json:"retry_after"`
 	Meta       map[string]string `json:"meta"`
 }
 
+// UserUpdate is the USER_UPDATE dispatch.
 type UserUpdate struct{ User }
 
 func (Ready) EventName() string                      { return "READY" }
@@ -494,6 +571,8 @@ func init() {
 	)
 }
 
+// Decode decodes dispatch data into the typed event registered for its name. It returns nil and no
+// error for names without a type, and a zero value for empty or null data.
 func Decode(event string, data json.RawMessage) (Event, error) {
 	f, ok := eventTypes[event]
 	if !ok {

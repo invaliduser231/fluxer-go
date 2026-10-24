@@ -35,49 +35,86 @@ const (
 )
 
 var (
+	// ErrInvalidToken is returned by Session.Run when the gateway closes a new session with code
+	// 4004. A 4004 during a resume drops the saved session and Run identifies again instead.
 	ErrInvalidToken = errors.New("fluxer: invalid token")
+	// ErrNotConnected is returned by Session.Send and the command methods while the session has no
+	// connection that received READY or RESUMED.
 	ErrNotConnected = errors.New("fluxer: gateway is not connected")
 	errReconnect    = errors.New("fluxer: server requested reconnect")
 	errZombie       = errors.New("fluxer: heartbeat not acknowledged")
 	errNoReady      = errors.New("fluxer: no ready before timeout")
 )
 
+// CloseError carries the close code and reason the gateway sent when it closed the connection.
 type CloseError struct {
 	Code   int
 	Reason string
 }
 
+// Error returns the close code and reason.
 func (e *CloseError) Error() string {
 	return fmt.Sprintf("fluxer: gateway closed with %d: %s", e.Code, e.Reason)
 }
 
+// Checkpoint holds the session ID and last sequence number needed to resume a gateway session.
+// Passing one to Session.Restore lets a new process resume a session Fluxer still keeps.
 type Checkpoint struct {
 	SessionID string
 	Seq       int64
 }
 
+// Shard identifies one shard by its ID and the total shard count. A zero Count leaves the shard out
+// of IDENTIFY.
 type Shard struct {
 	ID    int
 	Count int
 }
 
+// Session is a single gateway connection that reconnects and resumes on its own. Set the exported
+// fields before calling Run and leave them alone while it runs.
 type Session struct {
-	URL           string
-	Token         string
-	Shard         Shard
-	Flags         int
-	Compress      bool
-	Presence      *StatusUpdate
+	// URL is the gateway base URL. Empty means DefaultGateway. The session adds the version,
+	// encoding and compression query parameters.
+	URL   string
+	Token string
+	// Shard is sent with IDENTIFY when Shard.Count is above zero.
+	Shard Shard
+	// Flags is a bitmask of the Flag constants, sent with IDENTIFY when non-zero.
+	Flags int
+	// Compress negotiates zstd-stream compression. Outgoing commands are compressed once the server
+	// has sent its first binary frame.
+	Compress bool
+	// Presence is the initial presence sent with IDENTIFY.
+	Presence *StatusUpdate
+	// IgnoredEvents lists dispatch names Fluxer should not send to this session.
 	IgnoredEvents []string
-	Handler       func(event string, data json.RawMessage)
-	Logger        *slog.Logger
-	MinBackoff    time.Duration
-	MaxBackoff    time.Duration
-	ReadyTimeout  time.Duration
-	Pacer         *Pacer
-	Observe       func(step string)
-	HTTP          *http.Client
-	ReadLimit     int64
+	// Handler receives every dispatch with its name and raw data, and op 12 errors as
+	// GATEWAY_ERROR. It runs on the gateway read goroutine, so a handler that blocks delays all
+	// later events and heartbeat ACKs and can make the session drop the connection as dead.
+	Handler func(event string, data json.RawMessage)
+	// Logger receives a warning for each ended connection. Nil uses slog.Default.
+	Logger *slog.Logger
+	// MinBackoff and MaxBackoff bound the jittered delay between reconnect attempts, by default one
+	// second and one minute. The delay doubles after each attempt and starts over at MinBackoff
+	// once a connection reached READY. MinBackoff is also the wait before identifying again after
+	// INVALID_SESSION.
+	MinBackoff time.Duration
+	MaxBackoff time.Duration
+	// ReadyTimeout is how long the session waits for READY or RESUMED before it reconnects, 30
+	// seconds by default. A new session sends IDENTIFY once more before giving up on the
+	// connection.
+	ReadyTimeout time.Duration
+	// Pacer, when set, spaces out IDENTIFY calls, for example across shards that share one identify
+	// limit. Resumes are not paced.
+	Pacer *Pacer
+	// Observe is called at connection milestones with one of connect, connect_failed, identify,
+	// resume or disconnect.
+	Observe func(step string)
+	// HTTP is the client for the WebSocket handshake. Nil uses http.DefaultClient.
+	HTTP *http.Client
+	// ReadLimit caps the size of a single WebSocket message in bytes, 32 MiB by default.
+	ReadLimit int64
 
 	mu        sync.Mutex
 	sessionID string
@@ -94,30 +131,43 @@ type payload struct {
 	T  string          `json:"t,omitempty"`
 }
 
+// Checkpoint returns the current session ID and sequence number. It is safe to call while Run is
+// active.
 func (s *Session) Checkpoint() Checkpoint {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return Checkpoint{SessionID: s.sessionID, Seq: s.seq}
 }
 
+// Restore replaces the stored session ID and sequence number. Call it before Run to resume from an
+// earlier Checkpoint. An empty Checkpoint makes the next connection identify from scratch.
 func (s *Session) Restore(c Checkpoint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessionID, s.seq = c.SessionID, c.Seq
 }
 
+// User returns the bot user from the most recent READY.
 func (s *Session) User() User {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.user
 }
 
+// Latency returns the round trip time of the last acknowledged heartbeat, or zero before the first
+// ACK.
 func (s *Session) Latency() time.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.latency
 }
 
+// Run connects to the gateway and keeps the session alive until ctx ends. After a dropped
+// connection it waits with jittered backoff and reconnects, resuming when it holds a session ID.
+// Close code 4007 discards the session so the next attempt identifies. Run returns ctx.Err() once
+// ctx ends, ErrInvalidToken when a new session is closed with 4004, a *BanError when the handshake
+// reports an IP ban, and a *CloseError for close codes 4002, 4010, 4011 and 4012. Every other error
+// leads to another attempt.
 func (s *Session) Run(ctx context.Context) error {
 	backoff := s.minBackoff()
 	for {

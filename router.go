@@ -7,7 +7,10 @@ import (
 	"sync"
 )
 
+// Router decodes dispatches into typed events and calls the handlers registered for them. Its
+// Handle method fits Session.Handler. The zero value is ready to use.
 type Router struct {
+	// OnError, when set, receives decode failures and recovered handler panics.
 	OnError func(event string, err error)
 
 	mu     sync.RWMutex
@@ -31,8 +34,12 @@ type anyHandler struct {
 	fn func(event string, data json.RawMessage)
 }
 
+// NewRouter returns an empty Router.
 func NewRouter() *Router { return &Router{} }
 
+// On registers fn for the event type P and returns a function that removes it. The data of each
+// dispatch is decoded once and every handler of that type receives the same value. Empty or null
+// data yields a zero value.
 func On[T any, P interface {
 	*T
 	Event
@@ -65,6 +72,8 @@ func On[T any, P interface {
 	}
 }
 
+// OnAny registers fn for every dispatch and returns a function that removes it. OnAny handlers run
+// before the typed handlers.
 func (r *Router) OnAny(fn func(event string, data json.RawMessage)) func() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -78,6 +87,10 @@ func (r *Router) OnAny(fn func(event string, data json.RawMessage)) func() {
 	}
 }
 
+// Handle passes one dispatch to the OnAny handlers and then to the typed handlers for its name,
+// each in registration order. Typed handlers are skipped when decoding fails. A panicking handler
+// is recovered and reported to OnError, and the remaining handlers still run. Handlers added or
+// removed during Handle take effect with the next dispatch.
 func (r *Router) Handle(event string, data json.RawMessage) {
 	r.mu.RLock()
 	anys := slices.Clone(r.any)
