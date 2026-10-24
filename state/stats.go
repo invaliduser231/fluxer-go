@@ -2,6 +2,7 @@ package state
 
 import "sync/atomic"
 
+// Stats is a snapshot of how many entries each table of a cache holds.
 type Stats struct {
 	Guilds      int
 	Channels    int
@@ -13,8 +14,10 @@ type Stats struct {
 	Messages    int
 	Emojis      int
 	Stickers    int
-	Hits        uint64
-	Misses      uint64
+	// Hits counts Resolver lookups that were answered from the cache.
+	Hits uint64
+	// Misses counts Resolver lookups that went to the API.
+	Misses uint64
 }
 
 type counters struct {
@@ -33,6 +36,8 @@ func count[V any](t Table[V]) int {
 	return n
 }
 
+// Stats counts the entries in every table of the store. It walks all groups, which
+// can be slow with a remote store.
 func (c *Cache) Stats() Stats {
 	s := c.store
 	return Stats{

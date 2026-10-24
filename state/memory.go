@@ -26,12 +26,16 @@ type memIndex struct {
 	where map[string]string
 }
 
+// MemoryTable is an in-memory Table, sharded by group. An indexed table also records
+// which group holds each key, for Locate.
 type MemoryTable[V any] struct {
 	shards  [memShards]memShard[V]
 	indexed bool
 	index   [memShards]memIndex
 }
 
+// NewMemoryTable returns an empty table. With indexed set, Locate works, which
+// assumes that each key is used in only one group.
 func NewMemoryTable[V any](indexed bool) *MemoryTable[V] {
 	t := &MemoryTable[V]{indexed: indexed}
 	for i := range t.shards {
@@ -43,6 +47,7 @@ func NewMemoryTable[V any](indexed bool) *MemoryTable[V] {
 
 func (t *MemoryTable[V]) shard(group string) *memShard[V] { return &t.shards[shardOf(group)] }
 
+// Get returns the value stored under group and key.
 func (t *MemoryTable[V]) Get(group, key string) (V, bool) {
 	s := t.shard(group)
 	s.mu.RLock()
@@ -51,6 +56,7 @@ func (t *MemoryTable[V]) Get(group, key string) (V, bool) {
 	return v, ok
 }
 
+// Put stores v under group and key.
 func (t *MemoryTable[V]) Put(group, key string, v V) {
 	s := t.shard(group)
 	s.mu.Lock()
@@ -69,6 +75,7 @@ func (t *MemoryTable[V]) Put(group, key string, v V) {
 	}
 }
 
+// Delete removes one value and drops the group once it is empty.
 func (t *MemoryTable[V]) Delete(group, key string) {
 	s := t.shard(group)
 	s.mu.Lock()
@@ -94,6 +101,7 @@ func (t *MemoryTable[V]) unindex(group, key string) {
 	ix.mu.Unlock()
 }
 
+// DeleteGroup removes every value in group.
 func (t *MemoryTable[V]) DeleteGroup(group string) {
 	s := t.shard(group)
 	s.mu.Lock()
@@ -105,6 +113,7 @@ func (t *MemoryTable[V]) DeleteGroup(group string) {
 	}
 }
 
+// Group returns a snapshot of group taken when Group is called.
 func (t *MemoryTable[V]) Group(group string) iter.Seq2[string, V] {
 	s := t.shard(group)
 	s.mu.RLock()
@@ -113,6 +122,7 @@ func (t *MemoryTable[V]) Group(group string) iter.Seq2[string, V] {
 	return maps.All(snapshot)
 }
 
+// Len returns the number of values in group.
 func (t *MemoryTable[V]) Len(group string) int {
 	s := t.shard(group)
 	s.mu.RLock()
@@ -120,6 +130,7 @@ func (t *MemoryTable[V]) Len(group string) int {
 	return len(s.groups[group])
 }
 
+// Groups returns a snapshot of the names of all non-empty groups.
 func (t *MemoryTable[V]) Groups() iter.Seq[string] {
 	var all []string
 	for i := range t.shards {
@@ -133,6 +144,8 @@ func (t *MemoryTable[V]) Groups() iter.Seq[string] {
 	return slices.Values(all)
 }
 
+// Locate returns the group that holds key. It always returns false for a table
+// created without an index.
 func (t *MemoryTable[V]) Locate(key string) (string, bool) {
 	if !t.indexed {
 		return "", false
@@ -144,6 +157,8 @@ func (t *MemoryTable[V]) Locate(key string) (string, bool) {
 	return g, ok
 }
 
+// MemoryStore is the default in-memory Store. Its channel and message tables are
+// indexed.
 type MemoryStore struct {
 	guilds    *MemoryTable[GuildRecord]
 	channels  *MemoryTable[fluxer.Channel]
@@ -157,6 +172,7 @@ type MemoryStore struct {
 	messages  *MemoryTable[fluxer.Message]
 }
 
+// NewMemoryStore returns an empty store.
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		guilds:    NewMemoryTable[GuildRecord](false),
@@ -172,13 +188,32 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) Guilds() Table[GuildRecord]            { return s.guilds }
-func (s *MemoryStore) Channels() Table[fluxer.Channel]       { return s.channels }
-func (s *MemoryStore) Roles() Table[fluxer.Role]             { return s.roles }
-func (s *MemoryStore) Members() Table[fluxer.Member]         { return s.members }
+// Guilds returns the guild table.
+func (s *MemoryStore) Guilds() Table[GuildRecord] { return s.guilds }
+
+// Channels returns the channel table.
+func (s *MemoryStore) Channels() Table[fluxer.Channel] { return s.channels }
+
+// Roles returns the role table.
+func (s *MemoryStore) Roles() Table[fluxer.Role] { return s.roles }
+
+// Members returns the member table.
+func (s *MemoryStore) Members() Table[fluxer.Member] { return s.members }
+
+// VoiceStates returns the voice state table.
 func (s *MemoryStore) VoiceStates() Table[fluxer.VoiceState] { return s.voice }
-func (s *MemoryStore) Emojis() Table[fluxer.Emoji]           { return s.emojis }
-func (s *MemoryStore) Stickers() Table[fluxer.Sticker]       { return s.stickers }
-func (s *MemoryStore) Users() Table[fluxer.User]             { return s.users }
-func (s *MemoryStore) Presences() Table[fluxer.Presence]     { return s.presences }
-func (s *MemoryStore) Messages() Table[fluxer.Message]       { return s.messages }
+
+// Emojis returns the emoji table.
+func (s *MemoryStore) Emojis() Table[fluxer.Emoji] { return s.emojis }
+
+// Stickers returns the sticker table.
+func (s *MemoryStore) Stickers() Table[fluxer.Sticker] { return s.stickers }
+
+// Users returns the user table.
+func (s *MemoryStore) Users() Table[fluxer.User] { return s.users }
+
+// Presences returns the presence table.
+func (s *MemoryStore) Presences() Table[fluxer.Presence] { return s.presences }
+
+// Messages returns the message table.
+func (s *MemoryStore) Messages() Table[fluxer.Message] { return s.messages }

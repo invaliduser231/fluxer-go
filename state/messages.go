@@ -7,8 +7,15 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// DefaultMessagesPerChannel is the number of messages kept per channel when
+// WithMessages is not used.
 const DefaultMessagesPerChannel = 100
 
+// WithMessages sets how many messages are kept per channel and for how long. When a
+// channel goes over perChannel, its oldest messages are evicted. A ttl of zero keeps
+// messages until the limit evicts them; otherwise expired messages are removed when
+// the channel gets a new message or by SweepMessages. A perChannel of zero or less
+// disables the message cache.
 func WithMessages(perChannel int, ttl time.Duration) Option {
 	return func(c *Cache) {
 		c.messageLimit, c.messageTTL = perChannel, ttl
@@ -18,16 +25,22 @@ func WithMessages(perChannel int, ttl time.Duration) Option {
 	}
 }
 
+// WithMessagePolicy limits which messages are cached. SweepMessages removes cached
+// messages that no longer match.
 func WithMessagePolicy(p Policy[fluxer.Message]) Option {
 	return func(c *Cache) { c.messagePolicy = p }
 }
 
+// WithMessageEvict sets a function that is called for every message removed by the
+// limit, the TTL or SweepMessages. Messages deleted by events are not reported.
 func WithMessageEvict(fn func(fluxer.Message)) Option { return func(c *Cache) { c.onEvict = fn } }
 
+// MessagesInGuilds keeps messages sent in the listed guilds.
 func MessagesInGuilds(guildIDs ...string) Policy[fluxer.Message] {
 	return func(_ *Cache, m fluxer.Message) bool { return slices.Contains(guildIDs, m.GuildID) }
 }
 
+// MessagesFromHumans keeps messages that were not sent by a bot or a webhook.
 func MessagesFromHumans() Policy[fluxer.Message] {
 	return func(_ *Cache, m fluxer.Message) bool { return !m.Author.Bot && m.WebhookID == "" }
 }
@@ -168,10 +181,13 @@ func (c *Cache) applyMessage(e fluxer.Event) {
 	}
 }
 
+// Message returns a cached message.
 func (c *Cache) Message(channelID, messageID string) (fluxer.Message, bool) {
 	return c.store.Messages().Get(channelID, messageID)
 }
 
+// MessageByID returns a cached message without knowing its channel. It needs a
+// store whose message table supports Locate.
 func (c *Cache) MessageByID(messageID string) (fluxer.Message, bool) {
 	channelID, ok := c.store.Messages().Locate(messageID)
 	if !ok {
@@ -180,6 +196,9 @@ func (c *Cache) MessageByID(messageID string) (fluxer.Message, bool) {
 	return c.store.Messages().Get(channelID, messageID)
 }
 
+// Messages returns cached messages of a channel between q.After and q.Before, newest
+// first. When only q.After is set, it returns the messages right after it, oldest
+// first. q.Limit caps the number of results.
 func (c *Cache) Messages(channelID string, q fluxer.MessageQuery) []fluxer.Message {
 	var out []fluxer.Message
 	for _, m := range c.store.Messages().Group(channelID) {
@@ -201,6 +220,8 @@ func (c *Cache) Messages(channelID string, q fluxer.MessageQuery) []fluxer.Messa
 	return out
 }
 
+// SweepMessages removes expired messages and messages that fail the message policy,
+// calling the evict function for each one. It returns the number removed.
 func (c *Cache) SweepMessages() int {
 	now := time.Now()
 	removed := 0

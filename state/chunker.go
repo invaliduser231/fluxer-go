@@ -15,26 +15,43 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// ErrChunkTimeout is returned by Chunker.Request when not all chunks arrived within
+// Chunker.Timeout.
 var ErrChunkTimeout = errors.New("state: member chunks did not arrive in time")
 
+// MemberRequester sends a request guild members command. *fluxer.Session implements
+// it.
 type MemberRequester interface {
 	RequestGuildMembers(ctx context.Context, r fluxer.RequestMembers) error
 }
 
+// RateLimitedError is returned by Chunker.Request when the gateway answers the
+// request with RATE_LIMITED.
 type RateLimitedError struct {
-	GuildID    string
+	GuildID string
+	// RetryAfter is how long to wait before requesting members of the guild again.
 	RetryAfter time.Duration
 }
 
+// Error implements the error interface.
 func (e *RateLimitedError) Error() string {
 	return fmt.Sprintf("state: member request for %s is rate limited for %s", e.GuildID, e.RetryAfter)
 }
 
+// Chunker requests guild members over the gateway and collects the matching
+// GUILD_MEMBERS_CHUNK events. Pass raw dispatches to Handle.
 type Chunker struct {
+	// Requester sends the member requests.
 	Requester MemberRequester
-	Filter    func(guildID string) bool
-	Timeout   time.Duration
-	OnError   func(guildID string, err error)
+	// Filter, when set, makes Handle request all members of each guild in a
+	// GUILD_CREATE for which it returns true. ChunkAll and ChunkGuilds are ready-made
+	// filters.
+	Filter func(guildID string) bool
+	// Timeout is how long Request waits for all chunks after sending the request. The
+	// default is 30 seconds.
+	Timeout time.Duration
+	// OnError receives errors from the requests started by Filter.
+	OnError func(guildID string, err error)
 
 	mu      sync.Mutex
 	pending map[string]*chunkRequest
@@ -50,12 +67,15 @@ type chunkRequest struct {
 	done      chan struct{}
 }
 
+// NewChunker returns a chunker that sends requests through r.
 func NewChunker(r MemberRequester) *Chunker {
 	return &Chunker{Requester: r, pending: map[string]*chunkRequest{}}
 }
 
+// ChunkAll is a Chunker.Filter that matches every guild.
 func ChunkAll(string) bool { return true }
 
+// ChunkGuilds returns a Chunker.Filter that matches the listed guilds.
 func ChunkGuilds(ids ...string) func(string) bool {
 	return func(id string) bool { return slices.Contains(ids, id) }
 }
@@ -66,6 +86,10 @@ func newNonce() string {
 	return hex.EncodeToString(b)
 }
 
+// Request sends r with a new nonce, waits until every chunk for that nonce has
+// arrived and returns the collected members. Presences in the chunks are not
+// returned. It fails with a *RateLimitedError if the gateway rate limits the
+// request, with ErrChunkTimeout after Timeout, or with the context's error.
 func (k *Chunker) Request(ctx context.Context, r fluxer.RequestMembers) ([]fluxer.Member, error) {
 	r.Nonce = newNonce()
 	req := &chunkRequest{guildID: r.GuildID, seen: map[int]bool{}, done: make(chan struct{})}
@@ -98,10 +122,14 @@ func (k *Chunker) Request(ctx context.Context, r fluxer.RequestMembers) ([]fluxe
 	return req.members, nil
 }
 
+// RequestAll requests every member of a guild.
 func (k *Chunker) RequestAll(ctx context.Context, guildID string) ([]fluxer.Member, error) {
 	return k.Request(ctx, fluxer.RequestMembers{GuildID: guildID})
 }
 
+// Handle processes a raw gateway dispatch. It reads GUILD_MEMBERS_CHUNK,
+// RATE_LIMITED and GUILD_CREATE and ignores other events. Chunks without a nonce or
+// with a nonce the chunker did not send are ignored.
 func (k *Chunker) Handle(event string, data json.RawMessage) {
 	switch event {
 	case "GUILD_MEMBERS_CHUNK":
@@ -198,6 +226,8 @@ func (r *readyState) wait() <-chan struct{} {
 	return r.done
 }
 
+// WaitGuilds blocks until every guild listed in the last READY has arrived through
+// GUILD_CREATE or GUILD_DELETE, or until ctx is done.
 func (c *Cache) WaitGuilds(ctx context.Context) error {
 	select {
 	case <-c.ready.wait():
@@ -207,6 +237,7 @@ func (c *Cache) WaitGuilds(ctx context.Context) error {
 	}
 }
 
+// PendingGuilds returns how many guilds from the last READY have not arrived yet.
 func (c *Cache) PendingGuilds() int {
 	c.ready.mu.Lock()
 	defer c.ready.mu.Unlock()

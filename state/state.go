@@ -13,9 +13,13 @@ import (
 
 const lockStripes = 64
 
+// Cache keeps gateway state in a Store. Pass every dispatch to Handle or Apply; the
+// read methods are safe to call from any goroutine.
 type Cache struct {
+	// SkipMembers stops the cache from storing members other than the bot's own member.
 	SkipMembers bool
-	OnError     func(event string, err error)
+	// OnError receives events that Handle could not decode.
+	OnError func(event string, err error)
 
 	store         Store
 	flags         Flags
@@ -34,10 +38,13 @@ type Cache struct {
 	self   fluxer.User
 }
 
+// Option configures a Cache created by New.
 type Option func(*Cache)
 
+// WithStore sets the backing store. The default is a new MemoryStore.
 func WithStore(s Store) Option { return func(c *Cache) { c.store = s } }
 
+// New returns a cache that stores everything in FlagsAll, with opts applied in order.
 func New(opts ...Option) *Cache {
 	c := &Cache{flags: FlagsAll}
 	for _, opt := range opts {
@@ -49,6 +56,7 @@ func New(opts ...Option) *Cache {
 	return c
 }
 
+// Store returns the backing store.
 func (c *Cache) Store() Store { return c.store }
 
 func (c *Cache) lock(guildID string) func() {
@@ -57,6 +65,8 @@ func (c *Cache) lock(guildID string) func() {
 	return mu.Unlock
 }
 
+// Handle decodes a raw gateway dispatch and applies it. Decode errors go to OnError
+// and event names the library does not know are ignored.
 func (c *Cache) Handle(event string, data json.RawMessage) {
 	e, err := fluxer.Decode(event, data)
 	if err != nil {
@@ -146,6 +156,8 @@ func eventGuild(e fluxer.Event) string {
 	return ""
 }
 
+// Apply updates the cache from a decoded event and then runs the OnChange handlers.
+// Events for the same guild are applied one at a time.
 func (c *Cache) Apply(e fluxer.Event) {
 	unlock := c.lock(eventGuild(e))
 	var old any
@@ -493,12 +505,15 @@ func (c *Cache) putVoice(guildID string, v fluxer.VoiceState) {
 	c.store.VoiceStates().Put(guildID, key, v)
 }
 
+// Self returns the bot user from the last READY, kept current by USER_UPDATE.
 func (c *Cache) Self() fluxer.User {
 	c.selfMu.RLock()
 	defer c.selfMu.RUnlock()
 	return c.self
 }
 
+// Guild returns a cached guild with its roles, emojis, stickers and non-thread
+// channels filled in. Unavailable guilds are reported as missing.
 func (c *Cache) Guild(id string) (fluxer.Guild, bool) {
 	rec, ok := c.store.Guilds().Get("", id)
 	if !ok || rec.Unavailable {
@@ -507,6 +522,7 @@ func (c *Cache) Guild(id string) (fluxer.Guild, bool) {
 	return c.assemble(rec.Guild), true
 }
 
+// Guilds returns all available guilds sorted by ID, assembled like Guild.
 func (c *Cache) Guilds() []fluxer.Guild {
 	var out []fluxer.Guild
 	for _, rec := range c.store.Guilds().Group("") {
@@ -518,6 +534,7 @@ func (c *Cache) Guilds() []fluxer.Guild {
 	return out
 }
 
+// Unavailable reports whether the guild is known but currently unavailable.
 func (c *Cache) Unavailable(id string) bool {
 	rec, ok := c.store.Guilds().Get("", id)
 	return ok && rec.Unavailable
@@ -557,8 +574,11 @@ func (c *Cache) roles(guildID string) []fluxer.Role {
 	return out
 }
 
+// Channel returns a cached guild channel, thread or DM channel by ID.
 func (c *Cache) Channel(id string) (fluxer.Channel, bool) { return c.channel(id) }
 
+// GuildChannels returns the guild's channels without threads, sorted by position and
+// then ID.
 func (c *Cache) GuildChannels(guildID string) []fluxer.Channel {
 	var out []fluxer.Channel
 	for _, ch := range c.store.Channels().Group(guildID) {
@@ -575,6 +595,8 @@ func (c *Cache) GuildChannels(guildID string) []fluxer.Channel {
 	return out
 }
 
+// Threads returns the cached threads of parentID sorted by ID. It returns nil when
+// the parent channel is not cached.
 func (c *Cache) Threads(parentID string) []fluxer.Channel {
 	parent, ok := c.channel(parentID)
 	if !ok {
@@ -590,10 +612,13 @@ func (c *Cache) Threads(parentID string) []fluxer.Channel {
 	return out
 }
 
+// Role returns a cached role.
 func (c *Cache) Role(guildID, roleID string) (fluxer.Role, bool) {
 	return c.store.Roles().Get(guildID, roleID)
 }
 
+// Member returns a cached member. When the stored member carries only a user ID, the
+// user is filled in from the user table.
 func (c *Cache) Member(guildID, userID string) (fluxer.Member, bool) {
 	m, ok := c.store.Members().Get(guildID, userID)
 	if ok {
@@ -611,17 +636,24 @@ func (c *Cache) complete(m fluxer.Member) fluxer.Member {
 	return m
 }
 
+// MemberPartial reports whether a member is cached without user details such as the
+// username.
 func (c *Cache) MemberPartial(guildID, userID string) bool {
 	m, ok := c.Member(guildID, userID)
 	return ok && (m.User == nil || m.User.Username == "")
 }
 
+// User returns a cached user. Users are collected from READY, members, presences and
+// messages while FlagUsers is set.
 func (c *Cache) User(id string) (fluxer.User, bool) { return c.store.Users().Get("", id) }
 
+// Presence returns a user's presence in a guild. Offline users have no cached
+// presence.
 func (c *Cache) Presence(guildID, userID string) (fluxer.Presence, bool) {
 	return c.store.Presences().Get(guildID, userID)
 }
 
+// Presences returns the guild's cached presences sorted by user ID.
 func (c *Cache) Presences(guildID string) []fluxer.Presence {
 	out := slices.Collect(maps.Values(maps.Collect(c.store.Presences().Group(guildID))))
 	slices.SortFunc(out, func(a, b fluxer.Presence) int { return fluxer.CompareSnowflakes(a.User.ID, b.User.ID) })
@@ -651,6 +683,7 @@ func (c *Cache) putPresence(guildID string, p fluxer.Presence) {
 	c.store.Presences().Put(guildID, p.User.ID, p)
 }
 
+// Members returns the guild's cached members sorted by user ID.
 func (c *Cache) Members(guildID string) []fluxer.Member {
 	var out []fluxer.Member
 	for _, m := range c.store.Members().Group(guildID) {
@@ -660,12 +693,16 @@ func (c *Cache) Members(guildID string) []fluxer.Member {
 	return out
 }
 
+// VoiceStates returns the guild's voice states sorted by user ID. A user connected
+// from several sessions appears once per connection.
 func (c *Cache) VoiceStates(guildID string) []fluxer.VoiceState {
 	out := slices.Collect(maps.Values(maps.Collect(c.store.VoiceStates().Group(guildID))))
 	slices.SortFunc(out, func(a, b fluxer.VoiceState) int { return fluxer.CompareSnowflakes(a.UserID, b.UserID) })
 	return out
 }
 
+// VoiceChannel returns the voice channel a user is in, or an empty string. For a
+// user with several connections in the guild it returns any one of them.
 func (c *Cache) VoiceChannel(guildID, userID string) string {
 	for _, v := range c.store.VoiceStates().Group(guildID) {
 		if v.UserID == userID {
@@ -675,6 +712,9 @@ func (c *Cache) VoiceChannel(guildID, userID string) string {
 	return ""
 }
 
+// Permissions computes a member's permissions from cached data. An empty channelID
+// gives guild-level permissions, and a thread uses its parent's overwrites. It
+// returns false when the guild, member or channel is not cached.
 func (c *Cache) Permissions(guildID, channelID, userID string) (fluxer.Permissions, bool) {
 	rec, ok := c.store.Guilds().Get("", guildID)
 	if !ok {

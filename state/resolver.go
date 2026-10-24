@@ -7,6 +7,9 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// Resolver reads from a Cache and falls back to the REST API on a miss. Fetched
+// values are written back to the cache, subject to its flags and policies, and
+// concurrent fetches of the same value share one request.
 type Resolver struct {
 	Cache  *Cache
 	Client *fluxer.Client
@@ -21,6 +24,7 @@ type call struct {
 	err  error
 }
 
+// NewResolver returns a resolver for c that fetches missing data with client.
 func NewResolver(c *Cache, client *fluxer.Client) *Resolver {
 	return &Resolver{Cache: c, Client: client}
 }
@@ -48,6 +52,7 @@ func once[T any](r *Resolver, key string, fetch func() (T, error)) (T, error) {
 	return v, err
 }
 
+// Guild returns a guild from the cache or fetches it.
 func (r *Resolver) Guild(ctx context.Context, id string) (fluxer.Guild, error) {
 	if g, ok := r.Cache.Guild(id); ok {
 		r.Cache.hit()
@@ -64,6 +69,7 @@ func (r *Resolver) Guild(ctx context.Context, id string) (fluxer.Guild, error) {
 	})
 }
 
+// Channel returns a channel from the cache or fetches it.
 func (r *Resolver) Channel(ctx context.Context, id string) (fluxer.Channel, error) {
 	if ch, ok := r.Cache.Channel(id); ok {
 		r.Cache.hit()
@@ -82,6 +88,8 @@ func (r *Resolver) Channel(ctx context.Context, id string) (fluxer.Channel, erro
 	})
 }
 
+// Member returns a member from the cache, or fetches it when it is missing or
+// partial.
 func (r *Resolver) Member(ctx context.Context, guildID, userID string) (fluxer.Member, error) {
 	if m, ok := r.Cache.Member(guildID, userID); ok && !r.Cache.MemberPartial(guildID, userID) {
 		r.Cache.hit()
@@ -101,6 +109,7 @@ func (r *Resolver) Member(ctx context.Context, guildID, userID string) (fluxer.M
 	})
 }
 
+// User returns a user from the cache or fetches it.
 func (r *Resolver) User(ctx context.Context, id string) (fluxer.User, error) {
 	if u, ok := r.Cache.User(id); ok {
 		r.Cache.hit()
@@ -117,6 +126,7 @@ func (r *Resolver) User(ctx context.Context, id string) (fluxer.User, error) {
 	})
 }
 
+// Message returns a message from the cache or fetches it.
 func (r *Resolver) Message(ctx context.Context, channelID, messageID string) (fluxer.Message, error) {
 	if m, ok := r.Cache.Message(channelID, messageID); ok {
 		r.Cache.hit()
@@ -135,6 +145,8 @@ func (r *Resolver) Message(ctx context.Context, channelID, messageID string) (fl
 	})
 }
 
+// Roles returns the guild's roles. Any cached role for the guild counts as a hit,
+// and only a guild without cached roles is fetched.
 func (r *Resolver) Roles(ctx context.Context, guildID string) ([]fluxer.Role, error) {
 	if r.Cache.store.Roles().Len(guildID) > 0 {
 		r.Cache.hit()
@@ -155,6 +167,9 @@ func (r *Resolver) Roles(ctx context.Context, guildID string) ([]fluxer.Role, er
 	})
 }
 
+// Permissions fetches whatever is missing of the guild, its roles, the member, the
+// channel and a thread's parent, and then computes the permissions like
+// Cache.Permissions. An empty channelID gives guild-level permissions.
 func (r *Resolver) Permissions(ctx context.Context, guildID, channelID, userID string) (fluxer.Permissions, error) {
 	if _, err := r.Guild(ctx, guildID); err != nil {
 		return 0, err

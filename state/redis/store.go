@@ -14,8 +14,14 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
+// Store is a state.Store backed by Redis, so several processes can share one cache.
+// Each group is a Redis hash, and all keys start with the store's prefix.
 type Store struct {
+	// Timeout bounds each Redis operation. The default is 2 seconds.
 	Timeout time.Duration
+	// OnError receives Redis and decoding errors. Table methods have no error results,
+	// so a failed read looks like a miss and a failed write is dropped; OnError is the
+	// only place these errors show up.
 	OnError func(error)
 
 	client goredis.UniversalClient
@@ -33,6 +39,8 @@ type Store struct {
 	messages  *table[fluxer.Message]
 }
 
+// New returns a store that uses client and starts every key with prefix, or with
+// "fluxer" when prefix is empty.
 func New(client goredis.UniversalClient, prefix string) *Store {
 	s := &Store{client: client, prefix: cmp.Or(prefix, "fluxer")}
 	s.guilds = newTable[state.GuildRecord](s, "guilds", false)
@@ -48,16 +56,35 @@ func New(client goredis.UniversalClient, prefix string) *Store {
 	return s
 }
 
-func (s *Store) Guilds() state.Table[state.GuildRecord]      { return s.guilds }
-func (s *Store) Channels() state.Table[fluxer.Channel]       { return s.channels }
-func (s *Store) Roles() state.Table[fluxer.Role]             { return s.roles }
-func (s *Store) Members() state.Table[fluxer.Member]         { return s.members }
+// Guilds returns the guild table.
+func (s *Store) Guilds() state.Table[state.GuildRecord] { return s.guilds }
+
+// Channels returns the channel table, which is indexed.
+func (s *Store) Channels() state.Table[fluxer.Channel] { return s.channels }
+
+// Roles returns the role table.
+func (s *Store) Roles() state.Table[fluxer.Role] { return s.roles }
+
+// Members returns the member table.
+func (s *Store) Members() state.Table[fluxer.Member] { return s.members }
+
+// VoiceStates returns the voice state table.
 func (s *Store) VoiceStates() state.Table[fluxer.VoiceState] { return s.voice }
-func (s *Store) Emojis() state.Table[fluxer.Emoji]           { return s.emojis }
-func (s *Store) Stickers() state.Table[fluxer.Sticker]       { return s.stickers }
-func (s *Store) Users() state.Table[fluxer.User]             { return s.users }
-func (s *Store) Presences() state.Table[fluxer.Presence]     { return s.presences }
-func (s *Store) Messages() state.Table[fluxer.Message]       { return s.messages }
+
+// Emojis returns the emoji table.
+func (s *Store) Emojis() state.Table[fluxer.Emoji] { return s.emojis }
+
+// Stickers returns the sticker table.
+func (s *Store) Stickers() state.Table[fluxer.Sticker] { return s.stickers }
+
+// Users returns the user table.
+func (s *Store) Users() state.Table[fluxer.User] { return s.users }
+
+// Presences returns the presence table.
+func (s *Store) Presences() state.Table[fluxer.Presence] { return s.presences }
+
+// Messages returns the message table, which is indexed.
+func (s *Store) Messages() state.Table[fluxer.Message] { return s.messages }
 
 func (s *Store) ctx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), cmp.Or(s.Timeout, 2*time.Second))
@@ -228,6 +255,7 @@ func (t *table[V]) Locate(key string) (string, bool) {
 	return group, true
 }
 
+// Flush deletes every key that starts with the store's prefix.
 func (s *Store) Flush(ctx context.Context) error {
 	var cursor uint64
 	for {

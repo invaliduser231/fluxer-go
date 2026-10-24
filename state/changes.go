@@ -7,9 +7,16 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// Change describes an event that a cache has applied.
 type Change struct {
+	// Event is the applied event.
 	Event fluxer.Event
-	Old   any
+	// Old is the cached value from before the event. It is a pointer such as
+	// *fluxer.Channel or *fluxer.Message for update, delete and reaction events, and
+	// that pointer is nil when nothing was cached. MessageDeleteBulk gives the cached
+	// []fluxer.Message, and emoji and sticker updates give the previous slice. Old is
+	// nil for events that have no previous value.
+	Old any
 }
 
 type listeners struct {
@@ -23,6 +30,9 @@ type listener struct {
 	fn func(Change)
 }
 
+// OnChange registers fn to run after each event, once the cache has applied it and
+// released its lock. Handlers run on the goroutine that called Apply. The returned
+// function removes the handler.
 func (c *Cache) OnChange(fn func(Change)) func() {
 	l := &c.listeners
 	l.mu.Lock()
@@ -37,6 +47,9 @@ func (c *Cache) OnChange(fn func(Change)) func() {
 	}
 }
 
+// OnChange registers fn for events of type P. old is Change.Old converted to O, or
+// the zero value of O if the types do not match. With a pointer type such as
+// *fluxer.Channel for O, fn receives nil when nothing was cached.
 func OnChange[E any, P interface {
 	*E
 	fluxer.Event
