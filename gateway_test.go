@@ -292,3 +292,16 @@ func TestGatewaySurvivesOverflowingHeartbeatInterval(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
+
+func TestGatewayIdentifiesWhenResumeGetsNoAnswer(t *testing.T) {
+	srv, _ := setup(t)
+	_, events, _ := start(t, srv, "Bot "+srv.Token)
+	expect(t, events, "READY")
+
+	srv.IgnoreResumes(true)
+	srv.Drop()
+	expect(t, events, "READY")
+	if st := srv.Stats(); st.Identifies != 2 || st.Resumes == 0 {
+		t.Errorf("got %+v", st)
+	}
+}

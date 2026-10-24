@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -193,6 +194,9 @@ func (s *Session) Run(ctx context.Context) error {
 			case 4007:
 				s.Restore(Checkpoint{})
 			}
+		}
+		if resuming && errors.Is(err, errNoReady) {
+			s.Restore(Checkpoint{})
 		}
 		if ready {
 			backoff = s.minBackoff()
@@ -378,7 +382,7 @@ func (s *Session) authenticate(ctx context.Context, conn *wire) error {
 		return s.identify(ctx, conn)
 	}
 	s.observe("resume")
-	return s.send(ctx, conn, opResume, map[string]any{"token": s.Token, "session_id": c.SessionID, "seq": c.Seq})
+	return s.send(ctx, conn, opResume, map[string]any{"token": s.token(), "session_id": c.SessionID, "seq": c.Seq})
 }
 
 func (s *Session) identify(ctx context.Context, conn *wire) error {
@@ -389,7 +393,7 @@ func (s *Session) identify(ctx context.Context, conn *wire) error {
 	}
 	s.observe("identify")
 	d := map[string]any{
-		"token":      s.Token,
+		"token":      s.token(),
 		"properties": map[string]string{"os": runtime.GOOS, "browser": "fluxer-go", "device": "fluxer-go"},
 	}
 	if len(s.IgnoredEvents) > 0 {
@@ -483,6 +487,10 @@ func (s *Session) sendHeartbeat(ctx context.Context, conn *wire, b *beat) error 
 	b.sentAt, b.acked = time.Now(), false
 	b.mu.Unlock()
 	return s.send(ctx, conn, opHeartbeat, d)
+}
+
+func (s *Session) token() string {
+	return strings.TrimPrefix(strings.TrimSpace(s.Token), "Bot ")
 }
 
 func gatewayURL(base string, compress bool) (string, error) {

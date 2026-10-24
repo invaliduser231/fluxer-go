@@ -129,6 +129,7 @@ type gatewayState struct {
 	interval     time.Duration
 	dropIdentify int
 	rejectResume bool
+	ignoreResume bool
 	sessions     map[string]*session
 	conns        map[*conn]bool
 	stats        Stats
@@ -164,6 +165,14 @@ func (s *Server) DropNextIdentify() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gw.dropIdentify++
+}
+
+// IgnoreResumes makes the gateway leave every resume unanswered while on is
+// true, as a Fluxer node does that cannot reach the session.
+func (s *Server) IgnoreResumes(on bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gw.ignoreResume = on
 }
 
 // RejectNextResume makes every RESUME fail with close code 4004 until the next
@@ -320,6 +329,10 @@ func (s *Server) resume(c *conn, d json.RawMessage) bool {
 	_ = json.Unmarshal(d, &r)
 	s.mu.Lock()
 	s.gw.stats.Resumes++
+	if s.gw.ignoreResume {
+		s.mu.Unlock()
+		return true
+	}
 	if r.Token != s.Token || s.gw.rejectResume {
 		s.mu.Unlock()
 		return false
