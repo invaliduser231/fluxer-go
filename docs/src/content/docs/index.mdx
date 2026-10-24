@@ -1,0 +1,55 @@
+---
+title: fluxer-go
+description: Go library for the Fluxer API.
+---
+
+fluxer-go talks to [Fluxer](https://fluxer.app) from Go: the REST API, the gateway, voice over LiveKit, and a cache that keeps guilds, members and messages around so your bot doesn't have to ask for them again.
+
+```sh
+go get github.com/invaliduser231/fluxer-go
+```
+
+A bot that answers `!ping`:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	"github.com/invaliduser231/fluxer-go"
+)
+
+func main() {
+	ctx := context.Background()
+	client := fluxer.NewClient(os.Getenv("FLUXER_TOKEN"))
+	router := fluxer.NewRouter()
+
+	fluxer.On(router, func(m *fluxer.MessageCreate) {
+		if m.Content == "!ping" {
+			go client.Reply(ctx, &m.Message, fluxer.MessageSend{Content: "pong"})
+		}
+	})
+
+	session := &fluxer.Session{Token: client.Token, Handler: router.Handle}
+	log.Fatal(session.Run(ctx))
+}
+```
+
+[Your first bot](/fluxer-go/start/first-bot/) walks through this program and what happens when the connection drops.
+
+## What's in it
+
+- REST calls for everything a bot is allowed to do, with rate limit handling and retries
+- A gateway session that resumes after drops, optional zstd compression and sharding
+- Typed events and a small router
+- A cache with policies, old values for updates, member chunking and Redis storage
+- Voice: join a channel and play Ogg Opus or your own Opus frames
+- Webhooks, OAuth2, self-hosted instances and bots that run on several instances
+- `fluxertest`, a fake Fluxer server for your tests
+
+The API reference lives on [pkg.go.dev](https://pkg.go.dev/github.com/invaliduser231/fluxer-go). These pages cover how the pieces fit together.
+
+fluxer-go is not made by Fluxer Platform AB. Until 1.0, minor versions can contain breaking changes; the [changelog](https://github.com/invaliduser231/fluxer-go/blob/main/CHANGELOG.md) lists them.
