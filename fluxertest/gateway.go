@@ -69,6 +69,7 @@ type conn struct {
 	mu    sync.Mutex
 	sess  *session
 	token string
+	held  bool
 	zw    *zstd.Encoder
 	zbuf  bytes.Buffer
 }
@@ -128,6 +129,7 @@ func (c *conn) reader(ctx context.Context) func() ([]byte, error) {
 type gatewayState struct {
 	interval     time.Duration
 	dropIdentify int
+	holdIdentify time.Duration
 	rejectResume bool
 	ignoreResume bool
 	sessions     map[string]*session
@@ -165,6 +167,15 @@ func (s *Server) DropNextIdentify() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gw.dropIdentify++
+}
+
+// HoldNextIdentify makes the server answer the next IDENTIFY only after d, as
+// Fluxer does while it is busy. Another IDENTIFY on the same connection in the
+// meantime is closed with 4005.
+func (s *Server) HoldNextIdentify(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.gw.holdIdentify = d
 }
 
 // IgnoreResumes makes the gateway leave every resume unanswered while on is
@@ -252,9 +263,12 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 			c.send(map[string]any{"op": 11})
 		case 2:
 			s.mu.Lock()
-			attached, drop := c.sess != nil, s.gw.dropIdentify > 0
+			attached, drop, hold := c.sess != nil || c.held, s.gw.dropIdentify > 0, s.gw.holdIdentify
 			if drop && !attached {
 				s.gw.dropIdentify--
+			}
+			if hold > 0 && !attached && !drop {
+				s.gw.holdIdentify, c.held = 0, true
 			}
 			s.mu.Unlock()
 			switch {
@@ -262,6 +276,8 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 				ws.Close(4005, "Already authenticated")
 				return
 			case drop:
+			case hold > 0:
+				go s.release(c, p.D, hold)
 			case !s.identify(c, p.D):
 				ws.Close(4004, "Invalid token")
 				return
@@ -284,6 +300,16 @@ func (s *Server) gateway(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+}
+
+func (s *Server) release(c *conn, d json.RawMessage, after time.Duration) {
+	time.Sleep(after)
+	s.mu.Lock()
+	open := s.gw.conns[c]
+	s.mu.Unlock()
+	if open && !s.identify(c, d) {
+		c.ws.Close(4004, "Invalid token")
 	}
 }
 
