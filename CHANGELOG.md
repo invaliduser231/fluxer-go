@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+- Close codes 4001, 4003 and 4005 stop `Session.Run` with a `*CloseError` instead of reconnecting forever
+- No second identify while Fluxer holds the first; `ReadyTimeout` defaults to 65 seconds
+- Webhook avatars in audit logs are read from `avatar_hash`
+- Channel pin updates take the guild lock in the cache and no longer race with channel updates
+- Concurrent `Instances.Get` calls for one origin share a single discovery
+- Discovery of an https instance rejects http API endpoints, ws gateways and redirects to http
+
 ## 0.1.0
 
 - REST client for the bot routes of the API: messages, reactions, pins, channels, group DMs, threads, forums, guilds, roles, members, bans, emojis, stickers, invites, webhooks, audit logs, search, discovery, profiles and OAuth2
