@@ -129,8 +129,8 @@ func (r *Instances) Origins() []string {
 }
 
 // Pacer returns the identify pacer shared by all sessions of origin and
-// creates it on first use. Unlike Get, it uses origin as given without
-// normalizing it.
+// creates it on first use. origin is normalized like in Get; when that fails,
+// it is used as given.
 func (r *Instances) Pacer(origin string) *Pacer {
 	if normalized, err := NormalizeOrigin(origin); err == nil {
 		origin = normalized
