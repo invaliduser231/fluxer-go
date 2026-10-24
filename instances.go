@@ -23,7 +23,14 @@ type Instances struct {
 
 	mu     sync.Mutex
 	cache  map[string]cachedInstance
+	flight map[string]*discovery
 	pacers map[string]*Pacer
+}
+
+type discovery struct {
+	done chan struct{}
+	inst *Instance
+	err  error
 }
 
 type cachedInstance struct {
@@ -38,8 +45,9 @@ func NewInstances() *Instances { return &Instances{} }
 // Get returns the instance at origin, running discovery unless a fresh cache
 // entry exists. origin is normalized with NormalizeOrigin. When discovery fails
 // and an earlier result is cached, Get keeps returning that result until
-// discovery succeeds again. Failures caused by ctx ending are not cached.
-// Concurrent calls for an uncached origin each run their own discovery.
+// discovery succeeds again. Concurrent calls for the same origin share one
+// discovery, which keeps running when the caller that started it gives up, so
+// ctx only bounds how long Get waits.
 func (r *Instances) Get(ctx context.Context, origin string) (*Instance, error) {
 	origin, err := NormalizeOrigin(origin)
 	if err != nil {
@@ -47,32 +55,51 @@ func (r *Instances) Get(ctx context.Context, origin string) (*Instance, error) {
 	}
 	r.mu.Lock()
 	c, ok := r.cache[origin]
-	r.mu.Unlock()
 	if ok && time.Now().Before(c.until) {
+		r.mu.Unlock()
 		if c.inst != nil {
 			return c.inst, nil
 		}
 		return nil, c.err
 	}
-	inst, err := DiscoverWith(ctx, cmp.Or(r.HTTP, http.DefaultClient), origin)
-	if err != nil && ctx.Err() != nil {
-		return nil, err
+	d := r.flight[origin]
+	if d == nil {
+		d = &discovery{done: make(chan struct{})}
+		if r.flight == nil {
+			r.flight = map[string]*discovery{}
+		}
+		r.flight[origin] = d
+		go r.discover(context.WithoutCancel(ctx), origin, d)
 	}
+	r.mu.Unlock()
+	select {
+	case <-d.done:
+		return d.inst, d.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (r *Instances) discover(ctx context.Context, origin string, d *discovery) {
+	inst, err := DiscoverWith(ctx, cmp.Or(r.HTTP, http.DefaultClient), origin)
 	r.mu.Lock()
+	defer close(d.done)
 	defer r.mu.Unlock()
+	delete(r.flight, origin)
 	if r.cache == nil {
 		r.cache = map[string]cachedInstance{}
 	}
 	if err != nil {
 		stale := r.cache[origin].inst
 		r.cache[origin] = cachedInstance{inst: stale, err: err, until: time.Now().Add(cmp.Or(r.FailureTTL, time.Minute))}
+		d.inst, d.err = stale, err
 		if stale != nil {
-			return stale, nil
+			d.err = nil
 		}
-		return nil, err
+		return
 	}
 	r.cache[origin] = cachedInstance{inst: inst, until: time.Now().Add(cmp.Or(r.TTL, time.Hour))}
-	return inst, nil
+	d.inst = inst
 }
 
 // Forget drops the cache entry for origin, so the next Get runs discovery.

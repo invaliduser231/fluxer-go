@@ -14,11 +14,15 @@ import (
 	"github.com/invaliduser231/fluxer-go/fluxertest"
 )
 
-type countingTransport struct{ discoveries atomic.Int32 }
+type countingTransport struct {
+	discoveries atomic.Int32
+	delay       time.Duration
+}
 
 func (t *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if strings.HasSuffix(r.URL.Path, "/.well-known/fluxer") {
 		t.discoveries.Add(1)
+		time.Sleep(t.delay)
 	}
 	return http.DefaultTransport.RoundTrip(r)
 }
@@ -113,4 +117,29 @@ func TestSessionsOnSeveralInstances(t *testing.T) {
 	}
 	cancel()
 	wg.Wait()
+}
+
+func TestInstancesShareDiscovery(t *testing.T) {
+	srv := fluxertest.NewServer("1000.a")
+	defer srv.Close()
+	tr := &countingTransport{delay: 50 * time.Millisecond}
+	reg := &fluxer.Instances{HTTP: &http.Client{Transport: tr}}
+
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := reg.Get(gone, srv.URL); err == nil {
+		t.Fatal("expected the cancelled call to fail")
+	}
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Go(func() {
+			if _, err := reg.Get(context.Background(), srv.URL); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if n := tr.discoveries.Load(); n != 1 {
+		t.Errorf("%d discoveries", n)
+	}
 }
