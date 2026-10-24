@@ -13,32 +13,58 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// Errors returned by Manager and Conn.
 var (
+	// ErrTimeout is returned by Manager.Join when no voice server grant arrives within
+	// Manager.Timeout.
 	ErrTimeout = errors.New("voice: no voice grant before timeout")
-	ErrClosed  = errors.New("voice: connection closed")
+	// ErrClosed is returned when the connection has already been closed.
+	ErrClosed = errors.New("voice: connection closed")
 )
 
+// Gateway sends voice state updates. *fluxer.Session implements it.
 type Gateway interface {
 	UpdateVoiceState(ctx context.Context, v fluxer.VoiceStateCommand) error
 }
 
+// Room is a joined media room. The default implementation wraps a LiveKit room;
+// tests can provide their own through Manager.Connect.
 type Room interface {
+	// Publish publishes a local track and returns a function that unpublishes it.
 	Publish(track *lksdk.LocalTrack, opts lksdk.TrackPublicationOptions) (func() error, error)
+	// Disconnect leaves the room.
 	Disconnect()
 }
 
+// Connector joins the media room at endpoint with token. receive reports whether
+// remote tracks should be subscribed.
 type Connector func(ctx context.Context, endpoint, token string, cb *lksdk.RoomCallback, receive bool) (Room, error)
 
+// Options configures a connection made by Manager.Join.
 type Options struct {
-	SelfMute     bool
-	SelfDeaf     bool
-	OnTrack      func(userID string, track *webrtc.TrackRemote)
+	// SelfMute joins with the bot muted.
+	SelfMute bool
+	// SelfDeaf joins with the bot deafened.
+	SelfDeaf bool
+	// OnTrack is called for every remote track the connection subscribes to, with the
+	// user ID taken from the participant identity. Remote tracks are only subscribed
+	// when OnTrack is set.
+	OnTrack func(userID string, track *webrtc.TrackRemote)
+	// OnDisconnect is called when the media room drops the connection. It is not called
+	// after Leave or Close, or for a room that a move has replaced.
 	OnDisconnect func(reason string)
 }
 
+// Manager joins voice channels and keeps one connection per guild, or per channel
+// for DM calls. It listens on a router for voice server updates, voice state updates
+// and VOICE_ gateway errors.
 type Manager struct {
+	// Gateway sends the voice state commands.
 	Gateway Gateway
+	// Connect joins the media room. When nil, the manager connects to LiveKit.
 	Connect Connector
+	// Timeout is how long Join waits for a voice server grant. The default is 10
+	// seconds.
 	Timeout time.Duration
 
 	mu      sync.Mutex
@@ -52,6 +78,8 @@ type result struct {
 	err   error
 }
 
+// NewManager returns a manager that sends commands through gw and registers its
+// handlers on r. Close removes them again.
 func NewManager(gw Gateway, r *fluxer.Router) *Manager {
 	m := &Manager{Gateway: gw, conns: map[string]*Conn{}, pending: map[string]chan result{}}
 	m.remove = []func(){
@@ -62,6 +90,9 @@ func NewManager(gw Gateway, r *fluxer.Router) *Manager {
 	return m
 }
 
+// Close disconnects every media room and removes the router handlers. It sends no
+// voice state update, so the gateway is not told to leave the channels; use
+// Conn.Leave for that.
 func (m *Manager) Close() {
 	m.mu.Lock()
 	conns := make([]*Conn, 0, len(m.conns))
@@ -86,12 +117,19 @@ func scope(guildID, channelID string) string {
 	return guildID
 }
 
+// Conn returns the connection for a guild, or nil if there is none. DM call
+// connections are not returned.
 func (m *Manager) Conn(guildID string) *Conn {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.conns[guildID]
 }
 
+// Join joins a voice channel and returns once the media room is connected. An empty
+// guildID joins a DM call in channelID. If a connection for the guild already
+// exists, Join returns it, moving it first when channelID differs. Only one join per
+// guild can run at a time. Join fails with ErrTimeout when no grant arrives within
+// Timeout, and with the gateway error when the server refuses the join.
 func (m *Manager) Join(ctx context.Context, guildID, channelID string, opts Options) (*Conn, error) {
 	key := scope(guildID, channelID)
 	m.mu.Lock()
@@ -203,6 +241,8 @@ func (m *Manager) forget(c *Conn) {
 	}
 }
 
+// ParseIdentity splits a participant identity of the form
+// user_<userID>_<connectionID>.
 func ParseIdentity(identity string) (userID, connectionID string, ok bool) {
 	rest, ok := strings.CutPrefix(identity, "user_")
 	if !ok {

@@ -9,6 +9,7 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// Conn is a voice connection created by Manager.Join.
 type Conn struct {
 	m       *Manager
 	key     string
@@ -28,20 +29,24 @@ type Conn struct {
 	moved        chan *fluxer.VoiceServerUpdate
 }
 
+// GuildID returns the guild of the connection, or an empty string for a DM call.
 func (c *Conn) GuildID() string { return c.guildID }
 
+// ChannelID returns the current voice channel, which changes after Move.
 func (c *Conn) ChannelID() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.channelID
 }
 
+// ConnectionID returns the connection ID assigned by the gateway.
 func (c *Conn) ConnectionID() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.connectionID
 }
 
+// Room returns the current media room, or nil once the connection is closed.
 func (c *Conn) Room() Room {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -113,6 +118,7 @@ func (c *Conn) state() fluxer.VoiceStateCommand {
 	}
 }
 
+// SetMute changes the bot's self mute state on the gateway.
 func (c *Conn) SetMute(ctx context.Context, mute bool) error {
 	c.mu.Lock()
 	c.selfMute = mute
@@ -120,6 +126,7 @@ func (c *Conn) SetMute(ctx context.Context, mute bool) error {
 	return c.m.Gateway.UpdateVoiceState(ctx, c.state())
 }
 
+// SetDeaf changes the bot's self deaf state on the gateway.
 func (c *Conn) SetDeaf(ctx context.Context, deaf bool) error {
 	c.mu.Lock()
 	c.selfDeaf = deaf
@@ -127,6 +134,9 @@ func (c *Conn) SetDeaf(ctx context.Context, deaf bool) error {
 	return c.m.Gateway.UpdateVoiceState(ctx, c.state())
 }
 
+// Move switches the connection to another channel and reconnects the media room
+// once the new grant arrives. It waits until ctx is done; Manager.Timeout does not
+// apply.
 func (c *Conn) Move(ctx context.Context, channelID string) error {
 	moved := make(chan *fluxer.VoiceServerUpdate, 1)
 	c.mu.Lock()
@@ -154,6 +164,8 @@ func (c *Conn) Move(ctx context.Context, channelID string) error {
 	}
 }
 
+// Leave closes the media room and tells the gateway to leave the channel. The Conn
+// cannot be used afterwards.
 func (c *Conn) Leave(ctx context.Context) error {
 	cmd := c.state()
 	cmd.ChannelID = ""

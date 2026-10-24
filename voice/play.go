@@ -11,6 +11,8 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+// Play publishes an Ogg Opus stream and blocks until it has been sent or ctx is
+// done, then unpublishes the track. Calls on the same Conn run one after another.
 func (c *Conn) Play(ctx context.Context, ogg io.ReadCloser) error {
 	c.playing.Lock()
 	defer c.playing.Unlock()
@@ -44,6 +46,7 @@ func (c *Conn) Play(ctx context.Context, ogg io.ReadCloser) error {
 	}
 }
 
+// PlayFile plays an Ogg Opus file with Play.
 func (c *Conn) PlayFile(ctx context.Context, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -52,6 +55,9 @@ func (c *Conn) PlayFile(ctx context.Context, path string) error {
 	return c.Play(ctx, f)
 }
 
+// OpusTrack publishes a 48 kHz stereo Opus sample track called name, for callers
+// that write samples themselves. The returned function unpublishes and closes the
+// track.
 func (c *Conn) OpusTrack(name string) (*lksdk.LocalTrack, func() error, error) {
 	room := c.Room()
 	if room == nil {
