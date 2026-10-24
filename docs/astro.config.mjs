@@ -9,7 +9,10 @@ export default defineConfig({
 			title: 'fluxer-go',
 			description: 'Go library for the Fluxer API.',
 			logo: { src: './src/assets/logo.svg' },
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/invaliduser231/fluxer-go' }],
+			social: [
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/invaliduser231/fluxer-go' },
+				{ icon: 'comment', label: 'Community on Fluxer', href: 'https://fluxer.gg/a3ULk923' },
+			],
 			editLink: { baseUrl: 'https://github.com/invaliduser231/fluxer-go/edit/main/docs/' },
 			lastUpdated: true,
 			customCss: ['./src/styles/custom.css'],
