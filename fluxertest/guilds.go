@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/invaliduser231/fluxer-go"
@@ -182,7 +183,11 @@ func (s *Server) memberRoutes(withGuild func(func(http.ResponseWriter, *http.Req
 			}
 		}
 		slices.SortFunc(out, func(a, b fluxer.Member) int { return compareIDs(a.User.ID, b.User.ID) })
-		writeJSON(w, out)
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 1
+		}
+		writeJSON(w, out[:min(limit, len(out))])
 	}))
 	s.Handle("GET /v1/guilds/{guild}/members/{user}", member(func(w http.ResponseWriter, r *http.Request, g *fluxer.Guild, m *fluxer.Member) {
 		writeJSON(w, m)

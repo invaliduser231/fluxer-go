@@ -72,6 +72,9 @@ func TestMembers(t *testing.T) {
 	if err != nil || len(ms) != 2 || ms[0].User.ID != "8" || ms[1].User.ID != "1000" {
 		t.Fatalf("got %+v, %v", ms, err)
 	}
+	if ms, err = c.Members(ctx, "3", "", 0); err != nil || len(ms) != 3 {
+		t.Errorf("without a limit got %d members, %v", len(ms), err)
+	}
 	if err := c.AddMemberRole(ctx, "3", "7", "40"); err != nil {
 		t.Fatal(err)
 	}

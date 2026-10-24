@@ -65,7 +65,7 @@ func (c *Client) AllMembers(ctx context.Context, guildID string) iter.Seq2[Membe
 	return func(yield func(Member, error) bool) {
 		after := ""
 		for {
-			page, err := c.Members(ctx, guildID, after, 1000)
+			page, err := c.Members(ctx, guildID, after, maxMembersPage)
 			if err != nil {
 				yield(Member{}, err)
 				return
@@ -75,7 +75,7 @@ func (c *Client) AllMembers(ctx context.Context, guildID string) iter.Seq2[Membe
 					return
 				}
 			}
-			if len(page) < 1000 || page[len(page)-1].User == nil {
+			if len(page) < maxMembersPage || page[len(page)-1].User == nil {
 				return
 			}
 			after = page[len(page)-1].User.ID

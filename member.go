@@ -85,6 +85,8 @@ type MemberSearchPage struct {
 	Indexing         bool                 `json:"indexing"`
 }
 
+const maxMembersPage = 1000
+
 func membersPath(guildID string) string { return guildPath(guildID) + "/members" }
 
 func (c *Client) Member(ctx context.Context, guildID, userID string) (*Member, error) {
@@ -97,19 +99,15 @@ func (c *Client) CurrentMember(ctx context.Context, guildID string) (*Member, er
 }
 
 func (c *Client) Members(ctx context.Context, guildID, after string, limit int) ([]Member, error) {
-	v := url.Values{}
+	if limit <= 0 {
+		limit = maxMembersPage
+	}
+	v := url.Values{"limit": {strconv.Itoa(limit)}}
 	if after != "" {
 		v.Set("after", after)
 	}
-	if limit > 0 {
-		v.Set("limit", strconv.Itoa(limit))
-	}
-	path := membersPath(guildID)
-	if len(v) > 0 {
-		path += "?" + v.Encode()
-	}
 	var ms []Member
-	return ms, c.Do(ctx, http.MethodGet, path, nil, &ms)
+	return ms, c.Do(ctx, http.MethodGet, membersPath(guildID)+"?"+v.Encode(), nil, &ms)
 }
 
 func (c *Client) SearchMembers(ctx context.Context, guildID string, q MemberSearch) (*MemberSearchPage, error) {
