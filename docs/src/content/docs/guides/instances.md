@@ -15,6 +15,8 @@ session := inst.NewSession(token)
 session.Handler = router.Handle
 ```
 
+For an `https://` address, discovery refuses a document whose API isn't on `https://` or whose gateway isn't on `wss://`, and a redirect to plain HTTP, since the token would go over the wire unencrypted. `http://` addresses are fine for local test setups.
+
 That is all it takes to run only on your own instance. `inst.Features` tells you what the instance supports, for example whether voice is enabled, and `inst.Media` is the base for avatar and icon URLs.
 
 If you know the URLs already, skip discovery and set them yourself:

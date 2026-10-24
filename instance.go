@@ -65,8 +65,10 @@ func Discover(ctx context.Context, origin string) (*Instance, error) {
 // the instance it describes. origin should already be normalized, see
 // NormalizeOrigin. The request times out after 10 seconds. It fails when the
 // server does not answer 200, the document is larger than 256 KiB, or it lacks
-// the api_public or gateway endpoint. A client other than http.DefaultClient is
-// kept in Instance.HTTP.
+// the api_public or gateway endpoint. For an https origin it also fails when a
+// redirect leaves https or when the API is not served over https or the gateway
+// over wss, so the token never travels in plain text. A client other than
+// http.DefaultClient is kept in Instance.HTTP.
 func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Instance, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -81,6 +83,10 @@ func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Ins
 		return nil, err
 	}
 	defer resp.Body.Close()
+	secure := req.URL.Scheme == "https"
+	if secure && resp.Request.URL.Scheme != "https" {
+		return nil, fmt.Errorf("fluxer: the discovery request to %s was redirected away from https", host)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fluxer: %s has no discovery document, it answered with status %d", host, resp.StatusCode)
 	}
@@ -110,6 +116,12 @@ func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Ins
 	if e.APIPublic == "" || e.Gateway == "" {
 		return nil, fmt.Errorf("fluxer: the discovery document of %s has no api_public or gateway endpoint", host)
 	}
+	if err := checkEndpoint(host, "api_public", e.APIPublic, secure, "https", "http"); err != nil {
+		return nil, err
+	}
+	if err := checkEndpoint(host, "gateway", e.Gateway, secure, "wss", "ws"); err != nil {
+		return nil, err
+	}
 	inst := &Instance{
 		Origin:      origin,
 		API:         strings.TrimSuffix(e.APIPublic, "/") + "/v1",
@@ -125,6 +137,20 @@ func DiscoverWith(ctx context.Context, client *http.Client, origin string) (*Ins
 		inst.HTTP = client
 	}
 	return inst, nil
+}
+
+func checkEndpoint(host, name, raw string, secure bool, tls, plain string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("fluxer: the %s endpoint of %s is not a web address", name, host)
+	}
+	if u.Scheme == tls || u.Scheme == plain && !secure {
+		return nil
+	}
+	if secure {
+		return fmt.Errorf("fluxer: the %s endpoint of %s must use %s", name, host, tls)
+	}
+	return fmt.Errorf("fluxer: the %s endpoint of %s must use %s or %s", name, host, tls, plain)
 }
 
 // NormalizeOrigin turns user input such as "Chat.Example.com" into a lowercase

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -294,5 +295,41 @@ func TestNormalizeOrigin(t *testing.T) {
 		if _, err := fluxer.NormalizeOrigin(bad); err == nil {
 			t.Errorf("%s: expected error", bad)
 		}
+	}
+}
+
+func TestDiscoverKeepsHTTPSOrigins(t *testing.T) {
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"endpoints":{"api_public":"http://api.example.com","gateway":"ws://gw.example.com"}}`))
+	}))
+	defer plain.Close()
+	var doc string
+	tlsSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if doc == "" {
+			http.Redirect(w, r, plain.URL+r.URL.Path, http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte(doc))
+	}))
+	defer tlsSrv.Close()
+	ctx := context.Background()
+
+	for _, d := range []string{
+		"",
+		`{"endpoints":{"api_public":"http://api.example.com","gateway":"wss://gw.example.com"}}`,
+		`{"endpoints":{"api_public":"https://api.example.com","gateway":"ws://gw.example.com"}}`,
+		`{"endpoints":{"api_public":"api.example.com","gateway":"wss://gw.example.com"}}`,
+	} {
+		doc = d
+		if _, err := fluxer.DiscoverWith(ctx, tlsSrv.Client(), tlsSrv.URL); err == nil {
+			t.Errorf("%q: expected error", d)
+		}
+	}
+	doc = `{"endpoints":{"api_public":"https://api.example.com","gateway":"wss://gw.example.com"}}`
+	if inst, err := fluxer.DiscoverWith(ctx, tlsSrv.Client(), tlsSrv.URL); err != nil || inst.API != "https://api.example.com/v1" {
+		t.Errorf("got %+v, %v", inst, err)
+	}
+	if _, err := fluxer.DiscoverWith(ctx, plain.Client(), plain.URL); err != nil {
+		t.Errorf("plain origin: %v", err)
 	}
 }
