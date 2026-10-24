@@ -2,11 +2,9 @@ module github.com/invaliduser231/fluxer-go/state/redis
 
 go 1.26.0
 
-replace github.com/invaliduser231/fluxer-go => ../../
-
 require (
 	github.com/alicebob/miniredis/v2 v2.40.0
-	github.com/invaliduser231/fluxer-go v0.0.0-00010101000000-000000000000
+	github.com/invaliduser231/fluxer-go v0.1.0
 	github.com/redis/go-redis/v9 v9.23.0
 )
 
