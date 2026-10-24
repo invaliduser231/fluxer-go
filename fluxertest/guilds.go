@@ -17,6 +17,8 @@ type guildState struct {
 	webhooks map[string]fluxer.Webhook
 }
 
+// AddGuild adds or replaces a guild and registers its channels with the guild ID
+// set.
 func (s *Server) AddGuild(g fluxer.Guild) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -27,12 +29,16 @@ func (s *Server) AddGuild(g fluxer.Guild) {
 	}
 }
 
+// Guild returns a guild including changes made through the API, or the zero value
+// if it does not exist.
 func (s *Server) Guild(id string) fluxer.Guild {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.gs.guilds[id]
 }
 
+// AddMember adds or replaces a member of a guild. m.User must be set, and a zero
+// JoinedAt is set to the current time.
 func (s *Server) AddMember(guildID string, m fluxer.Member) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -45,6 +51,7 @@ func (s *Server) AddMember(guildID string, m fluxer.Member) {
 	s.gs.members[guildID][m.User.ID] = m
 }
 
+// GuildMember returns a member including changes made through the API.
 func (s *Server) GuildMember(guildID, userID string) (fluxer.Member, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -52,6 +59,7 @@ func (s *Server) GuildMember(guildID, userID string) (fluxer.Member, bool) {
 	return m, ok
 }
 
+// Banned reports whether the user was banned through the API.
 func (s *Server) Banned(guildID, userID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -18,20 +18,34 @@ import (
 
 const dropNoticed = 100 * time.Millisecond
 
+// Stats counts gateway activity since the server started.
 type Stats struct {
-	Dials      int
+	// Dials counts gateway connection attempts, including rejected ones.
+	Dials int
+	// Identifies counts accepted IDENTIFY payloads.
 	Identifies int
+	// Resumes counts RESUME attempts, including failed ones.
 	Resumes    int
 	Heartbeats int
-	Overlaps   int
-	Ignored    []string
+	// Overlaps counts sessions started or resumed while another connection with the
+	// same token was attached to a session.
+	Overlaps int
+	// Ignored is the ignored_events list of the last accepted IDENTIFY.
+	Ignored []string
+	// Identified holds the time of each accepted IDENTIFY.
 	Identified []time.Time
-	Identify   json.RawMessage
-	Shards     [][]int
+	// Identify is the raw payload of the last accepted IDENTIFY.
+	Identify json.RawMessage
+	// Shards holds the shard field of each accepted IDENTIFY that sent one.
+	Shards [][]int
+	// Compressed counts connections that negotiated zstd-stream compression.
 	Compressed int
-	Commands   []Command
+	// Commands records every command other than heartbeat, identify and resume that an
+	// identified connection sent, in order.
+	Commands []Command
 }
 
+// Command is a gateway payload received by the server.
 type Command struct {
 	Op int
 	D  json.RawMessage
@@ -131,28 +145,36 @@ func (s *Server) gatewayRoutes() {
 	s.mux.HandleFunc("GET /gateway", s.gateway)
 }
 
+// GatewayURL returns the WebSocket URL of the fake gateway.
 func (s *Server) GatewayURL() string {
 	return "ws" + strings.TrimPrefix(s.URL, "http") + "/gateway"
 }
 
+// SetHeartbeatInterval sets the interval sent in HELLO to new connections. The
+// default is 50ms.
 func (s *Server) SetHeartbeatInterval(d time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gw.interval = d
 }
 
+// DropNextIdentify makes the server ignore the next IDENTIFY without replying or
+// closing the connection. Each call drops one more.
 func (s *Server) DropNextIdentify() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gw.dropIdentify++
 }
 
+// RejectNextResume makes every RESUME fail with close code 4004 until the next
+// accepted IDENTIFY.
 func (s *Server) RejectNextResume() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gw.rejectResume = true
 }
 
+// Stats returns a copy of the gateway counters.
 func (s *Server) Stats() Stats {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -344,6 +366,9 @@ func (s *Server) detach(c *conn) {
 	}
 }
 
+// Dispatch sends an event to every session that did not list it in ignored_events.
+// Events are buffered per session, so a client that resumes receives what it
+// missed.
 func (s *Server) Dispatch(event string, data any) {
 	raw, _ := json.Marshal(data)
 	s.mu.Lock()
@@ -367,6 +392,8 @@ func (s *Server) Dispatch(event string, data any) {
 	}
 }
 
+// Drop closes every gateway connection without a close frame, as if the network
+// failed. Sessions stay valid for resuming.
 func (s *Server) Drop() {
 	for _, c := range s.liveConns() {
 		s.detach(c)
@@ -374,6 +401,8 @@ func (s *Server) Drop() {
 	}
 }
 
+// RequestReconnect sends RECONNECT to every connection and closes it with code 4000.
+// Sessions stay valid for resuming.
 func (s *Server) RequestReconnect() {
 	for _, c := range s.liveConns() {
 		c.send(map[string]any{"op": 7})
@@ -381,6 +410,8 @@ func (s *Server) RequestReconnect() {
 	}
 }
 
+// InvalidateSessions forgets all sessions and sends a non-resumable INVALID_SESSION
+// to every identified connection, so clients have to identify again.
 func (s *Server) InvalidateSessions() {
 	s.mu.Lock()
 	s.gw.sessions = map[string]*session{}
@@ -397,6 +428,7 @@ func (s *Server) InvalidateSessions() {
 	}
 }
 
+// Connections returns the number of open gateway connections.
 func (s *Server) Connections() int {
 	return len(s.liveConns())
 }

@@ -82,6 +82,8 @@ func (s *Server) dispatchTo(sess *session, event string, data any) {
 	}
 }
 
+// Commands returns the payloads of all received gateway commands with opcode op, in
+// order.
 func (s *Server) Commands(op int) []json.RawMessage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -101,18 +103,23 @@ type voiceState struct {
 	next     int
 }
 
+// SetVoiceEndpoint sets the endpoint sent in VOICE_SERVER_UPDATE. The default is
+// wss://voice.fluxer.invalid.
 func (s *Server) SetVoiceEndpoint(url string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.vs.endpoint = url
 }
 
+// RefuseNextVoice makes the server answer the next voice state command with a
+// gateway error carrying code instead of applying it.
 func (s *Server) RefuseNextVoice(code string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.vs.refuse = code
 }
 
+// VoiceStates returns the bot's current voice states sorted by connection ID.
 func (s *Server) VoiceStates() []fluxer.VoiceState {
 	s.mu.Lock()
 	defer s.mu.Unlock()

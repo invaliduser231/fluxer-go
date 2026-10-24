@@ -9,6 +9,7 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// The client credentials accepted by the OAuth2 endpoints.
 const (
 	OAuthClientID = "900"
 	OAuthSecret   = "fake-secret"
@@ -57,6 +58,8 @@ func (s *Server) oauthRoutes() {
 	})
 }
 
+// SetOAuthUser sets the user that later authorization codes are issued for. The
+// default is a user called owner with ID 1.
 func (s *Server) SetOAuthUser(u fluxer.User) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

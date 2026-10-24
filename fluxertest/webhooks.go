@@ -9,6 +9,7 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// Webhooks returns the webhooks created through the API, sorted by ID.
 func (s *Server) Webhooks() []fluxer.Webhook {
 	s.mu.Lock()
 	defer s.mu.Unlock()

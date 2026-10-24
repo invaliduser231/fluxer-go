@@ -14,12 +14,15 @@ import (
 	"github.com/invaliduser231/fluxer-go"
 )
 
+// AddMessage appends m to its channel's history without dispatching an event. m
+// keeps its own ID.
 func (s *Server) AddMessage(m fluxer.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.messages[m.ChannelID] = append(s.messages[m.ChannelID], m)
 }
 
+// Messages returns a copy of a channel's messages in the order they were added.
 func (s *Server) Messages(channelID string) []fluxer.Message {
 	s.mu.Lock()
 	defer s.mu.Unlock()
