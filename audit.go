@@ -71,12 +71,37 @@ type AuditLogEntry struct {
 }
 
 // AuditLog is a page of audit log entries plus the users, webhooks and threads they
-// reference.
+// reference. The webhooks carry no token or user.
 type AuditLog struct {
 	Entries  []AuditLogEntry `json:"audit_log_entries"`
 	Users    []User          `json:"users"`
 	Webhooks []Webhook       `json:"webhooks"`
 	Threads  []Channel       `json:"threads,omitempty"`
+}
+
+// UnmarshalJSON reads an audit log, taking the webhook avatars from the
+// avatar_hash field the audit log uses in place of avatar.
+func (l *AuditLog) UnmarshalJSON(data []byte) error {
+	type plain AuditLog
+	var raw struct {
+		plain
+		Webhooks []struct {
+			Webhook
+			AvatarHash string `json:"avatar_hash"`
+		} `json:"webhooks"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*l = AuditLog(raw.plain)
+	l.Webhooks = nil
+	for _, w := range raw.Webhooks {
+		if w.Avatar == "" {
+			w.Avatar = w.AvatarHash
+		}
+		l.Webhooks = append(l.Webhooks, w.Webhook)
+	}
+	return nil
 }
 
 // AuditLogQuery filters AuditLog. Before and After are entry IDs and UserID limits the

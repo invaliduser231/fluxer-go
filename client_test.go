@@ -3,6 +3,7 @@ package fluxer_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -225,6 +226,20 @@ func TestAuditLogReason(t *testing.T) {
 	}
 	if r := srv.Requests()[0].Reason; r != "spam again" {
 		t.Errorf("reason %q", r)
+	}
+}
+
+func TestAuditLogWebhookAvatar(t *testing.T) {
+	srv, c := setup(t)
+	srv.Handle("GET /v1/guilds/{guild}/audit-logs", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"audit_log_entries":[{"id":"1","action_type":50}],"users":[],"webhooks":[{"id":"5","guild_id":"9","channel_id":"2","name":"CI","avatar_hash":"abc","type":1}]}`))
+	})
+	l, err := c.AuditLog(context.Background(), "9", fluxer.AuditLogQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(l.Entries) != 1 || len(l.Webhooks) != 1 || l.Webhooks[0].Avatar != "abc" || l.Webhooks[0].Name != "CI" {
+		t.Errorf("got %+v", l)
 	}
 }
 
