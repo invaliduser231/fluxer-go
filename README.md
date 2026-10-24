@@ -1,3 +1,5 @@
+<img src="docs/src/assets/logo.svg" alt="" width="72" height="72">
+
 # fluxer-go
 
 Go library for the [Fluxer](https://fluxer.app) API: REST client, gateway, typed events, a state cache and voice over LiveKit.
