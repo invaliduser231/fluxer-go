@@ -29,7 +29,8 @@ func (s *Server) webhookRoutes() {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		s.mu.Lock()
 		ch := s.Channels[r.PathValue("channel")]
-		hook := fluxer.Webhook{ID: s.newID(), GuildID: ch.GuildID, ChannelID: ch.ID, Name: body.Name, Type: fluxer.WebhookIncoming, User: &s.User}
+		owner := s.User
+		hook := fluxer.Webhook{ID: s.newID(), GuildID: ch.GuildID, ChannelID: ch.ID, Name: body.Name, Type: fluxer.WebhookIncoming, User: &owner}
 		hook.Token = "token-" + hook.ID
 		s.gs.webhooks[hook.ID] = hook
 		s.mu.Unlock()

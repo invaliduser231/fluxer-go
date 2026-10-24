@@ -191,6 +191,7 @@ func (s *Server) Stats() Stats {
 	st.Ignored = append([]string(nil), st.Ignored...)
 	st.Identified = append([]time.Time(nil), st.Identified...)
 	st.Shards = append([][]int(nil), st.Shards...)
+	st.Commands = append([]Command(nil), st.Commands...)
 	return st
 }
 

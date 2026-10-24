@@ -40,6 +40,9 @@ func (s *Server) Guild(id string) fluxer.Guild {
 // AddMember adds or replaces a member of a guild. m.User must be set, and a zero
 // JoinedAt is set to the current time.
 func (s *Server) AddMember(guildID string, m fluxer.Member) {
+	if m.User == nil {
+		panic("fluxertest: AddMember needs a member with a user")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.gs.members[guildID] == nil {
