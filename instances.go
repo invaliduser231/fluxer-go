@@ -105,6 +105,9 @@ func (r *Instances) Origins() []string {
 // creates it on first use. Unlike Get, it uses origin as given without
 // normalizing it.
 func (r *Instances) Pacer(origin string) *Pacer {
+	if normalized, err := NormalizeOrigin(origin); err == nil {
+		origin = normalized
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.pacers == nil {

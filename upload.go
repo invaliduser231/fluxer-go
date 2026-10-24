@@ -127,6 +127,9 @@ func (c *Client) Upload(ctx context.Context, channelID string, files []File) ([]
 			FileSize: p.FileSize, Description: f.Description,
 		})
 	}
+	if len(out) != len(files) {
+		return nil, fmt.Errorf("fluxer: upload plan covers %d of %d files", len(out), len(files))
+	}
 	if len(multipart) > 0 {
 		body := map[string][]pending{"uploads": multipart}
 		if err := c.Do(ctx, http.MethodPost, channelPath(channelID)+"/attachments/complete", body, nil); err != nil {

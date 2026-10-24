@@ -108,3 +108,13 @@ func TestRefreshAttachmentURLs(t *testing.T) {
 		t.Errorf("got %v, %v", got, err)
 	}
 }
+
+func TestUploadPlanMissingFiles(t *testing.T) {
+	srv, c := setup(t)
+	srv.Handle("POST /v1/channels/{channel}/attachments", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"attachments":[]}`))
+	})
+	if _, err := c.Upload(context.Background(), "20", []fluxer.File{{Name: "a.txt", Data: []byte("x")}}); err == nil || !strings.Contains(err.Error(), "covers 0 of 1") {
+		t.Errorf("got %v", err)
+	}
+}
