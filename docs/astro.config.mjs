@@ -8,6 +8,7 @@ export default defineConfig({
 		starlight({
 			title: 'fluxer-go',
 			description: 'Go library for the Fluxer API.',
+			logo: { src: './src/assets/logo.svg' },
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/invaliduser231/fluxer-go' }],
 			editLink: { baseUrl: 'https://github.com/invaliduser231/fluxer-go/edit/main/docs/' },
 			lastUpdated: true,
