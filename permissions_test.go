@@ -42,6 +42,9 @@ func TestPermissionsHelpers(t *testing.T) {
 	if s := p.Remove(fluxer.PermSendMessages).String(); s != "VIEW_CHANNEL" {
 		t.Errorf("got %s", s)
 	}
+	if s := (fluxer.PermViewChannel | 1<<63).String(); s != "VIEW_CHANNEL|0x8000000000000000" {
+		t.Errorf("got %s", s)
+	}
 }
 
 func TestChannelPermissions(t *testing.T) {

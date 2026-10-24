@@ -108,7 +108,17 @@ func (p Permissions) String() string {
 	if p == 0 {
 		return "NONE"
 	}
-	return strings.Join(p.Names(), "|")
+	names := p.Names()
+	var known Permissions
+	for bit := range permissionNames {
+		if p.Has(bit) {
+			known |= bit
+		}
+	}
+	if rest := p &^ known; rest != 0 {
+		names = append(names, "0x"+strconv.FormatUint(uint64(rest), 16))
+	}
+	return strings.Join(names, "|")
 }
 
 // MarshalJSON encodes p as a quoted decimal number.

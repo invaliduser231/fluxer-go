@@ -118,6 +118,9 @@ func (e ReactionEmoji) String() string {
 	if e.ID == "" {
 		return e.Name
 	}
+	if e.Animated != nil && *e.Animated {
+		return "<a:" + e.Name + ":" + e.ID + ">"
+	}
 	return "<:" + e.Name + ":" + e.ID + ">"
 }
 

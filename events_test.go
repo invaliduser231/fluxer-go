@@ -50,7 +50,7 @@ func TestDecodeReactionEmoji(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := e.(*fluxer.MessageReactionAdd)
-	if r.Emoji.String() != "<:coin:123>" || r.Emoji.APIName() != "coin:123" || r.Emoji.Animated == nil || !*r.Emoji.Animated {
+	if r.Emoji.String() != "<a:coin:123>" || r.Emoji.APIName() != "coin:123" || r.Emoji.Animated == nil || !*r.Emoji.Animated {
 		t.Errorf("got %+v", r.Emoji)
 	}
 }
