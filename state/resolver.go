@@ -29,14 +29,19 @@ func NewResolver(c *Cache, client *fluxer.Client) *Resolver {
 	return &Resolver{Cache: c, Client: client}
 }
 
-func once[T any](r *Resolver, key string, fetch func() (T, error)) (T, error) {
+func once[T any](ctx context.Context, r *Resolver, key string, fetch func() (T, error)) (T, error) {
 	r.mu.Lock()
 	if r.flight == nil {
 		r.flight = map[string]*call{}
 	}
 	if c, ok := r.flight[key]; ok {
 		r.mu.Unlock()
-		<-c.done
+		select {
+		case <-c.done:
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		}
 		v, _ := c.val.(T)
 		return v, c.err
 	}
@@ -59,7 +64,7 @@ func (r *Resolver) Guild(ctx context.Context, id string) (fluxer.Guild, error) {
 		return g, nil
 	}
 	r.Cache.miss()
-	return once(r, "guild:"+id, func() (fluxer.Guild, error) {
+	return once(ctx, r, "guild:"+id, func() (fluxer.Guild, error) {
 		g, err := r.Client.Guild(ctx, id)
 		if err != nil {
 			return fluxer.Guild{}, err
@@ -76,7 +81,7 @@ func (r *Resolver) Channel(ctx context.Context, id string) (fluxer.Channel, erro
 		return ch, nil
 	}
 	r.Cache.miss()
-	return once(r, "channel:"+id, func() (fluxer.Channel, error) {
+	return once(ctx, r, "channel:"+id, func() (fluxer.Channel, error) {
 		ch, err := r.Client.Channel(ctx, id)
 		if err != nil {
 			return fluxer.Channel{}, err
@@ -96,7 +101,7 @@ func (r *Resolver) Member(ctx context.Context, guildID, userID string) (fluxer.M
 		return m, nil
 	}
 	r.Cache.miss()
-	return once(r, "member:"+guildID+":"+userID, func() (fluxer.Member, error) {
+	return once(ctx, r, "member:"+guildID+":"+userID, func() (fluxer.Member, error) {
 		m, err := r.Client.Member(ctx, guildID, userID)
 		if err != nil {
 			return fluxer.Member{}, err
@@ -116,7 +121,7 @@ func (r *Resolver) User(ctx context.Context, id string) (fluxer.User, error) {
 		return u, nil
 	}
 	r.Cache.miss()
-	return once(r, "user:"+id, func() (fluxer.User, error) {
+	return once(ctx, r, "user:"+id, func() (fluxer.User, error) {
 		u, err := r.Client.User(ctx, id)
 		if err != nil {
 			return fluxer.User{}, err
@@ -133,7 +138,7 @@ func (r *Resolver) Message(ctx context.Context, channelID, messageID string) (fl
 		return m, nil
 	}
 	r.Cache.miss()
-	return once(r, "message:"+channelID+":"+messageID, func() (fluxer.Message, error) {
+	return once(ctx, r, "message:"+channelID+":"+messageID, func() (fluxer.Message, error) {
 		m, err := r.Client.Message(ctx, channelID, messageID)
 		if err != nil {
 			return fluxer.Message{}, err
@@ -153,7 +158,7 @@ func (r *Resolver) Roles(ctx context.Context, guildID string) ([]fluxer.Role, er
 		return r.Cache.roles(guildID), nil
 	}
 	r.Cache.miss()
-	return once(r, "roles:"+guildID, func() ([]fluxer.Role, error) {
+	return once(ctx, r, "roles:"+guildID, func() ([]fluxer.Role, error) {
 		roles, err := r.Client.Roles(ctx, guildID)
 		if err != nil {
 			return nil, err
@@ -171,28 +176,30 @@ func (r *Resolver) Roles(ctx context.Context, guildID string) ([]fluxer.Role, er
 // channel and a thread's parent, and then computes the permissions like
 // Cache.Permissions. An empty channelID gives guild-level permissions.
 func (r *Resolver) Permissions(ctx context.Context, guildID, channelID, userID string) (fluxer.Permissions, error) {
-	if _, err := r.Guild(ctx, guildID); err != nil {
+	g, err := r.Guild(ctx, guildID)
+	if err != nil {
 		return 0, err
 	}
-	if _, err := r.Roles(ctx, guildID); err != nil {
+	if g.Roles, err = r.Roles(ctx, guildID); err != nil {
 		return 0, err
 	}
-	if _, err := r.Member(ctx, guildID, userID); err != nil {
+	m, err := r.Member(ctx, guildID, userID)
+	if err != nil {
 		return 0, err
 	}
-	if channelID != "" {
-		ch, err := r.Channel(ctx, channelID)
-		if err != nil {
+	if channelID == "" {
+		return fluxer.BasePermissions(g, userID, m.Roles), nil
+	}
+	ch, err := r.Channel(ctx, channelID)
+	if err != nil {
+		return 0, err
+	}
+	if ch.IsThread() {
+		if ch, err = r.Channel(ctx, ch.ParentID); err != nil {
 			return 0, err
 		}
-		if ch.IsThread() {
-			if _, err := r.Channel(ctx, ch.ParentID); err != nil {
-				return 0, err
-			}
-		}
 	}
-	p, _ := r.Cache.Permissions(guildID, channelID, userID)
-	return p, nil
+	return fluxer.ChannelPermissions(g, userID, m.Roles, ch), nil
 }
 
 func (c *Cache) storeGuild(g fluxer.Guild) {
