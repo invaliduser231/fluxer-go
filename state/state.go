@@ -152,6 +152,8 @@ func eventGuild(e fluxer.Event) string {
 		return e.GuildID
 	case *fluxer.MessageReactionRemoveEmoji:
 		return e.GuildID
+	case *fluxer.ChannelPinsUpdate:
+		return e.GuildID
 	}
 	return ""
 }

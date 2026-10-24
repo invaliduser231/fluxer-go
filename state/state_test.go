@@ -2,7 +2,10 @@ package state_test
 
 import (
 	"encoding/json"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/invaliduser231/fluxer-go"
 	"github.com/invaliduser231/fluxer-go/state"
@@ -127,5 +130,25 @@ func TestSkipMembers(t *testing.T) {
 	c.Handle("GUILD_CREATE", json.RawMessage(guildCreate))
 	if ms := c.Members("3"); len(ms) != 1 || ms[0].User.ID != "1000" {
 		t.Errorf("got %+v", ms)
+	}
+}
+
+func TestPinsUpdateKeepsConcurrentChannelUpdate(t *testing.T) {
+	c := setup(t)
+	pinned := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	for i := range 200 {
+		name := "general-" + strconv.Itoa(i)
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			c.Apply(&fluxer.ChannelUpdate{Channel: fluxer.Channel{ID: "30", GuildID: "3", Type: 0, Name: name}})
+		})
+		wg.Go(func() {
+			c.Apply(&fluxer.ChannelPinsUpdate{ChannelID: "30", GuildID: "3", LastPinTimestamp: &pinned})
+		})
+		wg.Wait()
+		ch, _ := c.Channel("30")
+		if ch.Name != name {
+			t.Fatalf("round %d: name %q", i, ch.Name)
+		}
 	}
 }
