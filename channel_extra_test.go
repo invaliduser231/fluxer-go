@@ -79,3 +79,25 @@ func TestChannelExtras(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchThreads(t *testing.T) {
+	srv, c := setup(t)
+	var query string
+	srv.Handle("GET /v1/channels/{channel}/threads/search", func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.RawQuery
+		_, _ = w.Write([]byte(`{"threads":[{"id":"51","type":11,"name":"login loop"}],"members":[{"id":"51","user_id":"1000","join_timestamp":"2026-10-24T10:00:00Z","flags":0,"muted":true,"mute_config":{"end_time":null,"selected_time_window":3600}}],
+			"has_more":false,"total_results":1,"first_messages":[{"id":"51","channel_id":"51","author":{"id":"7"},"content":"it loops"}]}`))
+	})
+	r, err := c.SearchThreads(context.Background(), "40", fluxer.ThreadSearch{
+		Name: "login", Tags: []string{"1", "2"}, TagSetting: fluxer.TagsMatchAll, SortBy: fluxer.ThreadSortCreated, SortOrder: "asc", AfterID: "50",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if query != "min_id=50&name=login&sort_by=creation_time&sort_order=asc&tag=1&tag=2&tag_setting=match_all" {
+		t.Errorf("query %s", query)
+	}
+	if r.TotalResults != 1 || len(r.FirstMessages) != 1 || r.FirstMessages[0].Content != "it loops" || !r.Members[0].Muted || r.Members[0].MuteConfig.SelectedTimeWindow != 3600 {
+		t.Errorf("got %+v", r)
+	}
+}

@@ -48,19 +48,36 @@ type ThreadList struct {
 
 // ThreadSearch filters SearchThreads. Empty fields are not sent: a nil Archived matches
 // both states, and zero Limit and Offset use the server defaults. Each entry in Tags is
-// sent as its own tag parameter.
+// sent as its own tag parameter, and TagSetting, TagsMatchSome or TagsMatchAll, decides
+// whether a post needs one of them or all. SortBy is one of the ThreadSort constants and
+// SortOrder asc or desc. AfterID and BeforeID limit the results by thread ID.
 type ThreadSearch struct {
-	Name     string
-	Archived *bool
-	Tags     []string
-	Limit    int
-	Offset   int
+	Name       string
+	Archived   *bool
+	Tags       []string
+	TagSetting string
+	SortBy     string
+	SortOrder  string
+	AfterID    string
+	BeforeID   string
+	Limit      int
+	Offset     int
 }
 
+// Sort keys for ThreadSearch.SortBy.
+const (
+	ThreadSortLastMessage = "last_message_time"
+	ThreadSortArchived    = "archive_time"
+	ThreadSortRelevance   = "relevance"
+	ThreadSortCreated     = "creation_time"
+)
+
 // ThreadSearchResult is the result of SearchThreads, with the total number of matches.
+// In forum and media channels FirstMessages holds the first message of each post.
 type ThreadSearchResult struct {
 	ThreadList
-	TotalResults int `json:"total_results"`
+	TotalResults  int       `json:"total_results"`
+	FirstMessages []Message `json:"first_messages,omitempty"`
 }
 
 // StartThreadFromMessage starts a thread attached to an existing message. Any Type set in
@@ -206,6 +223,11 @@ func (c *Client) SearchThreads(ctx context.Context, channelID string, q ThreadSe
 	}
 	for _, tag := range q.Tags {
 		v.Add("tag", tag)
+	}
+	for key, val := range map[string]string{"tag_setting": q.TagSetting, "sort_by": q.SortBy, "sort_order": q.SortOrder, "min_id": q.AfterID, "max_id": q.BeforeID} {
+		if val != "" {
+			v.Set(key, val)
+		}
 	}
 	if q.Limit > 0 {
 		v.Set("limit", strconv.Itoa(q.Limit))
