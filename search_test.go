@@ -62,3 +62,20 @@ func TestSearchMessages(t *testing.T) {
 		t.Errorf("got %+v, %v", r, err)
 	}
 }
+
+func TestSearchMessagesExcludes(t *testing.T) {
+	srv, c := setup(t)
+	everyone := false
+	_, err := c.SearchMessages(context.Background(), fluxer.MessageSearch{
+		Content: "deploy", AuthorTypes: []string{"bot"}, ExcludeChannelIDs: []string{"9"}, MentionEveryone: &everyone,
+		ExcludeAttachmentExtensions: []string{"exe"}, IncludeNSFW: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqs := srv.Requests()
+	want := `{"content":"deploy","exclude_channel_id":["9"],"author_type":["bot"],"mention_everyone":false,"exclude_attachment_extension":["exe"],"include_nsfw":true}`
+	if body := reqs[len(reqs)-1].Body; body != want {
+		t.Errorf("body %s", body)
+	}
+}
