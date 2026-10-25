@@ -247,7 +247,7 @@ func TestAuditLogWebhookAvatar(t *testing.T) {
 func TestSendMessageFiles(t *testing.T) {
 	srv, c := setup(t)
 	msg, err := c.SendMessageFiles(context.Background(), "20", fluxer.MessageSend{Content: "two files"}, []fluxer.File{
-		{Name: "cat.png", Data: []byte("png bytes"), Description: "a cat"},
+		{Name: "cat.png", Data: []byte("png bytes"), Description: "a cat", Flags: fluxer.AttachmentSpoiler},
 		{Name: "notes.txt", Data: []byte("hello")},
 	})
 	if err != nil {
@@ -255,11 +255,12 @@ func TestSendMessageFiles(t *testing.T) {
 	}
 	stored := srv.Messages("20")[0]
 	if msg.Content != "two files" || len(stored.Attachments) != 2 || stored.Attachments[0].Filename != "cat.png" ||
-		stored.Attachments[0].Size != 9 || stored.Attachments[1].Filename != "notes.txt" || !strings.HasSuffix(stored.Attachments[1].URL, "/notes.txt") {
+		stored.Attachments[0].Size != 9 || stored.Attachments[0].Description != "a cat" || stored.Attachments[0].Flags != fluxer.AttachmentSpoiler ||
+		stored.Attachments[1].Filename != "notes.txt" || !strings.HasSuffix(stored.Attachments[1].URL, "/notes.txt") {
 		t.Errorf("got %+v", stored)
 	}
 	body := srv.Requests()[0].Body
-	for _, want := range []string{`name="payload_json"`, `"nonce":"`, `name="files[1]"; filename="notes.txt"`, `"attachments":[{"id":0,"filename":"cat.png","description":"a cat"}`} {
+	for _, want := range []string{`name="payload_json"`, `"nonce":"`, `name="files[1]"; filename="notes.txt"`, `"attachments":[{"id":0,"filename":"cat.png","description":"a cat","flags":8}`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body has no %s:\n%s", want, body)
 		}

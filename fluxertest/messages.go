@@ -221,20 +221,37 @@ func decodeBody(r *http.Request, v any) []fluxer.Attachment {
 		return nil
 	}
 	var files []fluxer.Attachment
+	var meta struct {
+		Attachments []struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Flags       int    `json:"flags"`
+			Duration    int    `json:"duration"`
+			Waveform    string `json:"waveform"`
+		} `json:"attachments"`
+	}
 	mr := multipart.NewReader(r.Body, params["boundary"])
 	for {
 		part, err := mr.NextPart()
 		if err != nil {
-			return files
+			break
 		}
 		data, _ := io.ReadAll(part)
 		switch name := part.FormName(); {
 		case name == "payload_json":
 			_ = json.Unmarshal(data, v)
+			_ = json.Unmarshal(data, &meta)
 		case strings.HasPrefix(name, "files["):
 			files = append(files, fluxer.Attachment{Filename: part.FileName(), Size: int64(len(data))})
 		}
 	}
+	for i, m := range meta.Attachments {
+		if i < len(files) {
+			files[i].Title, files[i].Description, files[i].Flags = m.Title, m.Description, m.Flags
+			files[i].Duration, files[i].Waveform = m.Duration, m.Waveform
+		}
+	}
+	return files
 }
 
 func (s *Server) stored(channelID string, files []fluxer.Attachment) []fluxer.Attachment {

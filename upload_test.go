@@ -64,7 +64,7 @@ func TestUploadAndSend(t *testing.T) {
 
 	msg, err := c.SendMessageUploads(context.Background(), "20", fluxer.MessageSend{Content: "files"}, []fluxer.File{
 		{Name: "a.txt", Data: []byte("tiny")},
-		{Name: "video.mp4", Data: []byte("0123456789"), Description: "clip"},
+		{Name: "video.mp4", Data: []byte("0123456789"), Description: "clip", Title: "Launch", Flags: fluxer.AttachmentSpoiler},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -82,7 +82,7 @@ func TestUploadAndSend(t *testing.T) {
 	}
 	reqs := srv.Requests()
 	send := reqs[len(reqs)-1].Body
-	if msg.Content != "files" || !strings.Contains(send, `"upload_filename":"up-a.txt"`) || !strings.Contains(send, `"description":"clip"`) {
+	if msg.Content != "files" || !strings.Contains(send, `"upload_filename":"up-a.txt"`) || !strings.Contains(send, `"title":"Launch","description":"clip","flags":8`) {
 		t.Errorf("send body %s", send)
 	}
 	if _, err := c.Upload(context.Background(), "20", make([]fluxer.File, 11)); err == nil {

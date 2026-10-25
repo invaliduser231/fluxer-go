@@ -105,9 +105,11 @@ client.SendMessageUploads(ctx, channelID, fluxer.MessageSend{Content: "Call reco
 	[]fluxer.File{{Name: "call.mp4", Data: video}})
 ```
 
+`Flags: fluxer.AttachmentSpoiler` hides a file behind a spoiler, and `Title` gives it a caption. For voice messages set `Duration` and `Waveform` as well.
+
 At most ten files fit into one message. Some self-hosted instances turn presigned uploads off; `inst.Features.PresignedAttachmentUploads` tells you.
 
-Attachment URLs expire. `RefreshAttachmentURLs` turns old URLs into fresh ones.
+Attachment URLs expire, and `Attachment.ExpiresAt` says when. `RefreshAttachmentURLs` turns old URLs into fresh ones.
 
 ## Threads and forums
 

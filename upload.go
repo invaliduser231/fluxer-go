@@ -44,7 +44,11 @@ type UploadedFile struct {
 	ContentType    string `json:"content_type"`
 	UploadFilename string `json:"upload_filename"`
 	FileSize       int64  `json:"file_size"`
+	Title          string `json:"title,omitempty"`
 	Description    string `json:"description,omitempty"`
+	Flags          int    `json:"flags,omitempty"`
+	Duration       int    `json:"duration,omitempty"`
+	Waveform       string `json:"waveform,omitempty"`
 }
 
 func contentType(f File) string {
@@ -124,7 +128,7 @@ func (c *Client) Upload(ctx context.Context, channelID string, files []File) ([]
 		}
 		out = append(out, UploadedFile{
 			ID: p.ID, Filename: p.Filename, ContentType: p.ContentType, UploadFilename: p.UploadFilename,
-			FileSize: p.FileSize, Description: f.Description,
+			FileSize: p.FileSize, Title: f.Title, Description: f.Description, Flags: f.Flags, Duration: f.Duration, Waveform: f.Waveform,
 		})
 	}
 	if len(out) != len(files) {
