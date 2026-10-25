@@ -176,3 +176,16 @@ func TestThreadMembers(t *testing.T) {
 	}
 
 }
+
+func TestGroupDMRecipients(t *testing.T) {
+	c := setup(t)
+	c.Apply(&fluxer.ChannelRecipientAdd{ChannelID: "90", User: fluxer.User{ID: "7", Username: "anna"}})
+	c.Apply(&fluxer.ChannelRecipientAdd{ChannelID: "90", User: fluxer.User{ID: "7", Username: "anna"}})
+	if ch, _ := c.Channel("90"); len(ch.Recipients) != 1 {
+		t.Errorf("recipients %+v", ch.Recipients)
+	}
+	c.Apply(&fluxer.ChannelRecipientRemove{ChannelID: "90", User: fluxer.User{ID: "7"}})
+	if ch, _ := c.Channel("90"); len(ch.Recipients) != 0 {
+		t.Errorf("recipients %+v", ch.Recipients)
+	}
+}

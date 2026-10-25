@@ -309,6 +309,17 @@ func (c *Cache) apply(e fluxer.Event) {
 			}
 			c.putChannel(ch)
 		}
+	case *fluxer.ChannelRecipientAdd:
+		c.putUser(e.User)
+		if ch, ok := c.channel(e.ChannelID); ok && !slices.ContainsFunc(ch.Recipients, func(u fluxer.User) bool { return u.ID == e.User.ID }) {
+			ch.Recipients = append(ch.Recipients, e.User)
+			c.putChannel(ch)
+		}
+	case *fluxer.ChannelRecipientRemove:
+		if ch, ok := c.channel(e.ChannelID); ok {
+			ch.Recipients = slices.DeleteFunc(ch.Recipients, func(u fluxer.User) bool { return u.ID == e.User.ID })
+			c.putChannel(ch)
+		}
 	case *fluxer.MessageCreate:
 		c.putUser(e.Author)
 		if e.Member != nil && e.GuildID != "" {
