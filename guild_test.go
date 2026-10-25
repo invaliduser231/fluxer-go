@@ -142,7 +142,10 @@ func TestWebhooks(t *testing.T) {
 	if err != nil || msg.WebhookID != hook.ID || msg.Author.Username != "Relay" {
 		t.Fatalf("got %+v, %v", msg, err)
 	}
-	if got := srv.Messages("30"); len(got) != 1 || got[0].Content != "hi" {
+	if err := anon.ExecuteWebhookNoWait(ctx, parsed, "", fluxer.WebhookMessage{MessageSend: fluxer.MessageSend{Content: "quick"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := srv.Messages("30"); len(got) != 2 || got[0].Content != "hi" || got[1].Content != "quick" {
 		t.Errorf("got %+v", got)
 	}
 	if err := anon.DeleteWebhookWithToken(ctx, parsed); err != nil {

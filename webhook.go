@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -102,15 +103,25 @@ func (c *Client) DeleteWebhook(ctx context.Context, webhookID string) error {
 // multipart attachments, see DoFiles. A nonce is generated when m.Nonce is
 // empty, which makes the request safe to retry.
 func (c *Client) ExecuteWebhook(ctx context.Context, w Webhook, threadID string, m WebhookMessage, files []File) (*Message, error) {
+	var msg Message
+	return &msg, c.executeWebhook(ctx, w, threadID, m, files, true, &msg)
+}
+
+// ExecuteWebhookNoWait posts m through w like ExecuteWebhook but does not ask Fluxer to
+// return the message, which makes the call a little faster.
+func (c *Client) ExecuteWebhookNoWait(ctx context.Context, w Webhook, threadID string, m WebhookMessage, files []File) error {
+	return c.executeWebhook(ctx, w, threadID, m, files, false, nil)
+}
+
+func (c *Client) executeWebhook(ctx context.Context, w Webhook, threadID string, m WebhookMessage, files []File, wait bool, out any) error {
 	if m.Nonce == "" {
 		m.Nonce = newNonce()
 	}
-	q := url.Values{"wait": {"true"}}
+	q := url.Values{"wait": {strconv.FormatBool(wait)}}
 	if threadID != "" {
 		q.Set("thread_id", threadID)
 	}
-	var msg Message
-	return &msg, c.DoFiles(ctx, http.MethodPost, webhookPath(w.ID, w.Token)+"?"+q.Encode(), m, files, &msg)
+	return c.DoFiles(ctx, http.MethodPost, webhookPath(w.ID, w.Token)+"?"+q.Encode(), m, files, out)
 }
 
 // ParseWebhookURL extracts the webhook ID and token from a URL that contains
