@@ -6,7 +6,7 @@ import (
 )
 
 // Application is an OAuth2 application, as returned for the bot's own
-// application.
+// application. Bot is the application's bot user when it has one.
 type Application struct {
 	ID                  string   `json:"id"`
 	Name                string   `json:"name"`
@@ -16,6 +16,7 @@ type Application struct {
 	BotRequireCodeGrant bool     `json:"bot_require_code_grant"`
 	VerifyKey           string   `json:"verify_key,omitempty"`
 	Owner               *User    `json:"owner"`
+	Bot                 *User    `json:"bot,omitempty"`
 	RedirectURIs        []string `json:"redirect_uris,omitempty"`
 }
 
