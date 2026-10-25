@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0
+
+- Forwarding with `Client.Forward`, media-only forwards and `Message.MessageSnapshots`; messages also carry `Users` and call info
+- `GUILD_MEMBER_LIST_UPDATE`, `THREAD_MEMBER_LIST_UPDATE` and `GUILD_HEALTH_UPDATE` events, thread options for `Subscribe`
+- Attachments report expiry, content hash, placeholder and waveform; files can be spoilers and carry a title, duration and waveform
+- Message edits can keep, change and add attachments, `EditMessageUploads`
+- Channels carry forum defaults, voice connection limits, P2P, content warnings and thread counters, and forums can be set up fully on create and edit
+- Channels can be placed after a sibling in `ModifyChannelPositions`
+- Thread search sorts, matches all tags and returns first messages; thread members show their mute state
+- The cache follows thread member updates and group DM recipients
+- Member search filters by join date, account age, join source and invite; members can edit their guild profile
+- Guilds report threads, visits, content warnings, the history cutoff and image sizes; guild edits cover features, MFA, NSFW and content warnings
+- Message search takes every filter and exclusion of the API and returns threads
+- `ExecuteWebhookNoWait`, `PurgeEmoji`, `PurgeSticker`
+- Embeds carry oEmbed HTML, nested embeds and media details; follower webhooks name their source; the application includes its bot user
+- Voice states report E2EE and P2P, reaction removals carry the member
+- Constants for guild levels, operations and features, public user flags, reply mention preferences, attachment flags, forum settings, archive durations and `FlagGuildVisits`
+
 ## 0.1.1
 
 - Close codes 4001, 4003 and 4005 stop `Session.Run` with a `*CloseError` instead of reconnecting forever
