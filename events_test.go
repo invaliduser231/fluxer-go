@@ -79,3 +79,27 @@ func TestDecodeUnknownAndEmpty(t *testing.T) {
 		t.Error("expected error for a numeric id")
 	}
 }
+
+func TestDecodeMemberLists(t *testing.T) {
+	raw := `{"guild_id":"3","id":"30","member_count":2,"online_count":1,"groups":[{"id":"online","count":1},{"id":"offline","count":1}],
+		"ops":[{"op":"SYNC","range":[0,3],"items":[{"group":{"id":"online","count":1}},{"member":{"user":{"id":"7"},"roles":[],"presence":{"status":"online","mobile":false,"afk":false}}},
+		{"group":{"id":"offline","count":1}},{"member":{"user":{"id":"8"},"roles":[],"presence":{"status":"offline","mobile":false,"afk":false}}}]}]}`
+	e, err := fluxer.Decode("GUILD_MEMBER_LIST_UPDATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := e.(*fluxer.GuildMemberListUpdate)
+	if len(l.Ops) != 1 || l.Ops[0].Range != [2]int{0, 3} || len(l.Ops[0].Items) != 4 || l.Ops[0].Items[1].Member.User.ID != "7" ||
+		l.Ops[0].Items[1].Member.Presence.Status != "online" || l.Ops[0].Items[2].Group.ID != "offline" {
+		t.Errorf("got %+v", l)
+	}
+
+	raw = `{"guild_id":"3","thread_id":"50","members":[{"user_id":"7","join_timestamp":"2026-10-24T10:00:00Z","flags":0,"member":{"user":{"id":"7"},"roles":[]},"presence":null}]}`
+	e, err = fluxer.Decode("THREAD_MEMBER_LIST_UPDATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tl := e.(*fluxer.ThreadMemberListUpdate); tl.ThreadID != "50" || len(tl.Members) != 1 || tl.Members[0].UserID != "7" || tl.Members[0].Member == nil {
+		t.Errorf("got %+v", tl)
+	}
+}
