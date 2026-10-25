@@ -61,8 +61,35 @@ type Message struct {
 	Reactions         []MessageReaction `json:"reactions,omitempty"`
 	MessageReference  *MessageReference `json:"message_reference,omitempty"`
 	ReferencedMessage *Message          `json:"referenced_message,omitempty"`
+	MessageSnapshots  []MessageSnapshot `json:"message_snapshots,omitempty"`
+	Users             []User            `json:"users,omitempty"`
+	Call              *CallInfo         `json:"call,omitempty"`
 	Nonce             string            `json:"nonce,omitempty"`
 	Thread            *Channel          `json:"thread,omitempty"`
+}
+
+// MessageSnapshot is the copy of a forwarded message that Fluxer stores with
+// the forward. Mentions holds user IDs. The author and the origin of the
+// message are not part of it; MessageReference of the forward points at the
+// original.
+type MessageSnapshot struct {
+	Content         string           `json:"content"`
+	Timestamp       time.Time        `json:"timestamp"`
+	EditedTimestamp *time.Time       `json:"edited_timestamp,omitempty"`
+	Mentions        []string         `json:"mentions,omitempty"`
+	MentionRoles    []string         `json:"mention_roles,omitempty"`
+	MentionChannels []ChannelMention `json:"mention_channels,omitempty"`
+	Embeds          []Embed          `json:"embeds,omitempty"`
+	Attachments     []Attachment     `json:"attachments,omitempty"`
+	Stickers        []MessageSticker `json:"stickers,omitempty"`
+	Type            int              `json:"type"`
+	Flags           int              `json:"flags"`
+}
+
+// CallInfo describes the call of a call message.
+type CallInfo struct {
+	Participants   []string   `json:"participants"`
+	EndedTimestamp *time.Time `json:"ended_timestamp,omitempty"`
 }
 
 // URL returns a link to the message in the web app at webapp, using @me in place of the
