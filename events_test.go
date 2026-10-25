@@ -126,3 +126,18 @@ func TestDecodeAttachment(t *testing.T) {
 		t.Errorf("got %+v", a)
 	}
 }
+
+func TestDecodeForumChannel(t *testing.T) {
+	raw := `{"id":"40","guild_id":"3","type":15,"name":"help","default_sort_order":1,"default_forum_layout":2,"default_tag_setting":"match_all",
+		"default_thread_rate_limit_per_user":30,"nsfw":true,"nsfw_override":null,"content_warning_level":1,"voice_connection_limit":2,"rtc_p2p":true}`
+	e, err := fluxer.Decode("CHANNEL_CREATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := e.(*fluxer.ChannelCreate)
+	if c.DefaultSortOrder == nil || *c.DefaultSortOrder != fluxer.ForumSortCreationTime || c.DefaultForumLayout != fluxer.ForumLayoutGrid ||
+		c.DefaultTagSetting != fluxer.TagsMatchAll || c.DefaultThreadRateLimitPerUser != 30 || c.NSFWOverride != nil ||
+		c.ContentWarningLevel != fluxer.ContentWarningShow || !c.RTCP2P {
+		t.Errorf("got %+v", c.Channel)
+	}
+}

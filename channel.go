@@ -27,6 +27,35 @@ const (
 	ChannelFlagHideMediaDownload = 1 << 15
 )
 
+// Forum settings for Channel.DefaultForumLayout, Channel.DefaultSortOrder and
+// Channel.DefaultTagSetting.
+const (
+	ForumLayoutDefault      = 0
+	ForumLayoutList         = 1
+	ForumLayoutGrid         = 2
+	ForumSortLatestActivity = 0
+	ForumSortCreationTime   = 1
+	TagsMatchSome           = "match_some"
+	TagsMatchAll            = "match_all"
+)
+
+// Auto archive durations in minutes for threads and
+// Channel.DefaultAutoArchiveDuration.
+const (
+	ArchiveAfterHour      = 60
+	ArchiveAfterDay       = 1440
+	ArchiveAfterThreeDays = 4320
+	ArchiveAfterWeek      = 10080
+)
+
+// Content warning levels for Channel.ContentWarningLevel and
+// Guild.ContentWarningLevel. ContentWarningInherit takes the setting of the
+// category or guild.
+const (
+	ContentWarningInherit = 0
+	ContentWarningShow    = 1
+)
+
 // Overwrite types for Overwrite.Type.
 const (
 	OverwriteRole   = 0
@@ -34,37 +63,54 @@ const (
 )
 
 // Channel is a guild channel, thread, DM or group DM. The thread fields at the end are
-// only set for threads and forum channels.
+// only set for threads and forum channels. NSFW is the effective value, NSFWOverride the
+// channel's own setting, nil when it inherits. VoiceConnectionLimit caps the voice
+// connections per user and RTCP2P makes calls connect participants directly. Nicks holds
+// the nicknames in a group DM. TotalMessageSent counts every message ever sent in a
+// thread, while MessageCount drops deleted ones. MemberIDsPreview lists the latest
+// members of a forum post.
 type Channel struct {
-	ID                   string      `json:"id"`
-	GuildID              string      `json:"guild_id,omitempty"`
-	Type                 int         `json:"type"`
-	Name                 string      `json:"name,omitempty"`
-	Topic                string      `json:"topic,omitempty"`
-	URL                  string      `json:"url,omitempty"`
-	Icon                 string      `json:"icon,omitempty"`
-	OwnerID              string      `json:"owner_id,omitempty"`
-	Position             int         `json:"position,omitempty"`
-	ParentID             string      `json:"parent_id,omitempty"`
-	Bitrate              int         `json:"bitrate,omitempty"`
-	UserLimit            int         `json:"user_limit,omitempty"`
-	RTCRegion            string      `json:"rtc_region,omitempty"`
-	LastMessageID        string      `json:"last_message_id,omitempty"`
-	LastPinTimestamp     *time.Time  `json:"last_pin_timestamp,omitempty"`
-	PermissionOverwrites []Overwrite `json:"permission_overwrites,omitempty"`
-	Recipients           []User      `json:"recipients,omitempty"`
-	NSFW                 bool        `json:"nsfw,omitempty"`
-	RateLimitPerUser     int         `json:"rate_limit_per_user,omitempty"`
-	Flags                int         `json:"flags,omitempty"`
+	ID                   string            `json:"id"`
+	GuildID              string            `json:"guild_id,omitempty"`
+	Type                 int               `json:"type"`
+	Name                 string            `json:"name,omitempty"`
+	Topic                string            `json:"topic,omitempty"`
+	URL                  string            `json:"url,omitempty"`
+	Icon                 string            `json:"icon,omitempty"`
+	OwnerID              string            `json:"owner_id,omitempty"`
+	Position             int               `json:"position,omitempty"`
+	ParentID             string            `json:"parent_id,omitempty"`
+	Bitrate              int               `json:"bitrate,omitempty"`
+	UserLimit            int               `json:"user_limit,omitempty"`
+	VoiceConnectionLimit int               `json:"voice_connection_limit,omitempty"`
+	RTCRegion            string            `json:"rtc_region,omitempty"`
+	RTCP2P               bool              `json:"rtc_p2p,omitempty"`
+	LastMessageID        string            `json:"last_message_id,omitempty"`
+	LastPinTimestamp     *time.Time        `json:"last_pin_timestamp,omitempty"`
+	PermissionOverwrites []Overwrite       `json:"permission_overwrites,omitempty"`
+	Recipients           []User            `json:"recipients,omitempty"`
+	Nicks                map[string]string `json:"nicks,omitempty"`
+	NSFW                 bool              `json:"nsfw,omitempty"`
+	NSFWOverride         *bool             `json:"nsfw_override,omitempty"`
+	ContentWarningLevel  int               `json:"content_warning_level,omitempty"`
+	ContentWarningText   string            `json:"content_warning_text,omitempty"`
+	RateLimitPerUser     int               `json:"rate_limit_per_user,omitempty"`
+	Flags                int               `json:"flags,omitempty"`
 
-	ThreadMetadata             *ThreadMetadata  `json:"thread_metadata,omitempty"`
-	AppliedTags                []string         `json:"applied_tags,omitempty"`
-	MessageCount               int              `json:"message_count,omitempty"`
-	MemberCount                int              `json:"member_count,omitempty"`
-	Member                     *ThreadMember    `json:"member,omitempty"`
-	DefaultAutoArchiveDuration int              `json:"default_auto_archive_duration,omitempty"`
-	AvailableTags              []ForumTag       `json:"available_tags,omitempty"`
-	DefaultReactionEmoji       *DefaultReaction `json:"default_reaction_emoji,omitempty"`
+	ThreadMetadata                *ThreadMetadata  `json:"thread_metadata,omitempty"`
+	AppliedTags                   []string         `json:"applied_tags,omitempty"`
+	MessageCount                  int              `json:"message_count,omitempty"`
+	TotalMessageSent              int              `json:"total_message_sent,omitempty"`
+	MemberCount                   int              `json:"member_count,omitempty"`
+	MemberIDsPreview              []string         `json:"member_ids_preview,omitempty"`
+	Member                        *ThreadMember    `json:"member,omitempty"`
+	DefaultAutoArchiveDuration    int              `json:"default_auto_archive_duration,omitempty"`
+	DefaultThreadRateLimitPerUser int              `json:"default_thread_rate_limit_per_user,omitempty"`
+	AvailableTags                 []ForumTag       `json:"available_tags,omitempty"`
+	DefaultReactionEmoji          *DefaultReaction `json:"default_reaction_emoji,omitempty"`
+	DefaultSortOrder              *int             `json:"default_sort_order,omitempty"`
+	DefaultForumLayout            int              `json:"default_forum_layout,omitempty"`
+	DefaultTagSetting             string           `json:"default_tag_setting,omitempty"`
 }
 
 // IsThread reports whether the channel is an announcement, public or private thread.
