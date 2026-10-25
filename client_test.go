@@ -359,3 +359,32 @@ func TestForward(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+func TestEditMessageAttachments(t *testing.T) {
+	srv, c := setup(t)
+	srv.AddMessage(fluxer.Message{ID: "5", ChannelID: "1", Author: fluxer.User{ID: "1000"}, Attachments: []fluxer.Attachment{
+		{ID: "11", Filename: "old.png"}, {ID: "12", Filename: "keep.png"},
+	}})
+	alt := "chart"
+	m, err := c.EditMessage(context.Background(), "1", "5", fluxer.MessageEdit{
+		Attachments: &[]fluxer.AttachmentEdit{{ID: "12", Description: &alt}},
+		Uploads:     []fluxer.UploadedFile{{ID: 0, Filename: "new.png", UploadFilename: "up-new.png", FileSize: 3, ContentType: "image/png"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Attachments) != 2 || m.Attachments[0].ID != "12" || m.Attachments[0].Description != "chart" || m.Attachments[1].Filename != "new.png" {
+		t.Errorf("got %+v", m.Attachments)
+	}
+	reqs := srv.Requests()
+	if body := reqs[len(reqs)-1].Body; !strings.Contains(body, `"attachments":[{"id":"12","description":"chart"},{"id":0,"filename":"new.png"`) {
+		t.Errorf("body %s", body)
+	}
+	content := "only text"
+	if _, err := c.EditMessage(context.Background(), "1", "5", fluxer.MessageEdit{Content: &content}); err != nil {
+		t.Fatal(err)
+	}
+	if body := srv.Requests()[len(srv.Requests())-1].Body; strings.Contains(body, "attachments") {
+		t.Errorf("attachments sent without being set: %s", body)
+	}
+}

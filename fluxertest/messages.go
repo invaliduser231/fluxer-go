@@ -123,8 +123,21 @@ func (s *Server) messageRoutes() {
 		writeJSON(w, m)
 	})
 	s.Handle("PATCH /v1/channels/{channel}/messages/{message}", func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
 		var body fluxer.MessageEdit
-		_ = json.NewDecoder(r.Body).Decode(&body)
+		_ = json.Unmarshal(raw, &body)
+		var att struct {
+			Attachments *[]struct {
+				ID             json.RawMessage `json:"id"`
+				Filename       string          `json:"filename"`
+				UploadFilename string          `json:"upload_filename"`
+				FileSize       int64           `json:"file_size"`
+				Title          *string         `json:"title"`
+				Description    *string         `json:"description"`
+				Flags          *int            `json:"flags"`
+			} `json:"attachments"`
+		}
+		_ = json.Unmarshal(raw, &att)
 		s.mu.Lock()
 		bot := s.User.ID
 		s.mu.Unlock()
@@ -138,6 +151,32 @@ func (s *Server) messageRoutes() {
 			}
 			if body.Embeds != nil {
 				m.Embeds = *body.Embeds
+			}
+			if att.Attachments != nil {
+				var kept []fluxer.Attachment
+				for _, a := range *att.Attachments {
+					if a.UploadFilename != "" {
+						kept = append(kept, fluxer.Attachment{ID: s.newID(), Filename: a.Filename, Size: a.FileSize})
+						continue
+					}
+					var id string
+					_ = json.Unmarshal(a.ID, &id)
+					for _, old := range m.Attachments {
+						if old.ID == id {
+							if a.Title != nil {
+								old.Title = *a.Title
+							}
+							if a.Description != nil {
+								old.Description = *a.Description
+							}
+							if a.Flags != nil {
+								old.Flags = *a.Flags
+							}
+							kept = append(kept, old)
+						}
+					}
+				}
+				m.Attachments = kept
 			}
 			now := time.Now().UTC()
 			m.EditedTimestamp = &now

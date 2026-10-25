@@ -49,6 +49,14 @@ content := "Release notes (updated)"
 client.EditMessage(ctx, channelID, msgID, fluxer.MessageEdit{Content: &content})
 ```
 
+Attachments work differently: once you set `Attachments` or `Uploads`, the message keeps exactly the attachments you list, so name every one that should stay. New files have to go through the upload URLs, which `EditMessageUploads` does for you:
+
+```go
+keep := []fluxer.AttachmentEdit{{ID: m.Attachments[0].ID}}
+client.EditMessageUploads(ctx, channelID, msgID, fluxer.MessageEdit{Attachments: &keep},
+	[]fluxer.File{{Name: "chart-v2.png", Data: png}})
+```
+
 ```go
 client.DeleteMessage(ctx, channelID, msgID)
 client.BulkDelete(ctx, channelID, []string{"1189375284394692701", "1189375284394692702"})

@@ -2,6 +2,7 @@ package fluxer
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -231,11 +232,47 @@ func (m MessageSend) nonce() string { return m.Nonce }
 
 // MessageEdit holds the fields to change on a message. Only non-nil fields are sent, so a
 // pointer to an empty string or an empty slice removes the content or the embeds.
+//
+// Setting Attachments or Uploads replaces the attachments of the message with the existing ones
+// listed in Attachments followed by the files in Uploads, so list every attachment that should
+// stay. EditMessageUploads fills Uploads.
 type MessageEdit struct {
-	Content         *string          `json:"content,omitempty"`
-	Embeds          *[]Embed         `json:"embeds,omitempty"`
-	AllowedMentions *AllowedMentions `json:"allowed_mentions,omitempty"`
-	Flags           *int             `json:"flags,omitempty"`
+	Content         *string           `json:"content,omitempty"`
+	Embeds          *[]Embed          `json:"embeds,omitempty"`
+	AllowedMentions *AllowedMentions  `json:"allowed_mentions,omitempty"`
+	Flags           *int              `json:"flags,omitempty"`
+	Attachments     *[]AttachmentEdit `json:"-"`
+	Uploads         []UploadedFile    `json:"-"`
+}
+
+// AttachmentEdit keeps an existing attachment of an edited message. Title,
+// Description and Flags change it when non-nil.
+type AttachmentEdit struct {
+	ID          string  `json:"id"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Flags       *int    `json:"flags,omitempty"`
+}
+
+// MarshalJSON encodes the edit, merging Attachments and Uploads into one attachments array.
+func (m MessageEdit) MarshalJSON() ([]byte, error) {
+	type plain MessageEdit
+	if m.Attachments == nil && m.Uploads == nil {
+		return json.Marshal(plain(m))
+	}
+	list := []any{}
+	if m.Attachments != nil {
+		for _, a := range *m.Attachments {
+			list = append(list, a)
+		}
+	}
+	for _, u := range m.Uploads {
+		list = append(list, u)
+	}
+	return json.Marshal(struct {
+		plain
+		Attachments []any `json:"attachments"`
+	}{plain(m), list})
 }
 
 // MessageQuery selects the messages returned by Messages. Before, After and Around are
@@ -310,6 +347,17 @@ func (c *Client) Forward(ctx context.Context, m *Message, channelID string) (*Me
 	return c.SendMessage(ctx, channelID, MessageSend{MessageReference: &MessageReference{
 		Type: ReferenceForward, MessageID: m.ID, ChannelID: m.ChannelID, GuildID: m.GuildID,
 	}})
+}
+
+// EditMessageUploads uploads files with Upload and edits a message with m, adding the uploaded
+// files to m.Uploads. See MessageEdit for how the attachment list is replaced.
+func (c *Client) EditMessageUploads(ctx context.Context, channelID, messageID string, m MessageEdit, files []File) (*Message, error) {
+	uploaded, err := c.Upload(ctx, channelID, files)
+	if err != nil {
+		return nil, err
+	}
+	m.Uploads = append(m.Uploads, uploaded...)
+	return c.EditMessage(ctx, channelID, messageID, m)
 }
 
 // EditMessage applies m to a message and returns the updated message.
