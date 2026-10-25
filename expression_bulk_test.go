@@ -48,3 +48,27 @@ func TestBulkEmojis(t *testing.T) {
 		t.Errorf("got %+v, %v", src, err)
 	}
 }
+
+func TestPurgeExpressions(t *testing.T) {
+	srv, c := setup(t)
+	var got []string
+	for _, kind := range []string{"emojis", "stickers"} {
+		srv.Handle("DELETE /v1/guilds/{guild}/"+kind+"/{id}", func(w http.ResponseWriter, r *http.Request) {
+			got = append(got, kind+" "+r.PathValue("id")+" "+r.URL.RawQuery)
+			w.WriteHeader(http.StatusNoContent)
+		})
+	}
+	ctx := context.Background()
+	if err := c.DeleteEmoji(ctx, "3", "60"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.PurgeEmoji(ctx, "3", "61"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.PurgeSticker(ctx, "3", "70"); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || got[0] != "emojis 60 " || got[1] != "emojis 61 purge=true" || got[2] != "stickers 70 purge=true" {
+		t.Errorf("got %q", got)
+	}
+}

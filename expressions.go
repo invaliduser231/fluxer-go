@@ -58,6 +58,12 @@ func (c *Client) DeleteEmoji(ctx context.Context, guildID, emojiID string) error
 	return c.Do(ctx, http.MethodDelete, guildPath(guildID)+"/emojis/"+emojiID, nil, nil)
 }
 
+// PurgeEmoji removes a custom emoji from a guild and deletes its image from storage as
+// well. The guild needs FeatureExpressionPurgeAllowed.
+func (c *Client) PurgeEmoji(ctx context.Context, guildID, emojiID string) error {
+	return c.Do(ctx, http.MethodDelete, guildPath(guildID)+"/emojis/"+emojiID+"?purge=true", nil, nil)
+}
+
 // Stickers lists the custom stickers of a guild.
 func (c *Client) Stickers(ctx context.Context, guildID string) ([]Sticker, error) {
 	var ss []Sticker
@@ -85,4 +91,10 @@ func (c *Client) ModifySticker(ctx context.Context, guildID, stickerID string, e
 // DeleteSticker removes a custom sticker from a guild.
 func (c *Client) DeleteSticker(ctx context.Context, guildID, stickerID string) error {
 	return c.Do(ctx, http.MethodDelete, guildPath(guildID)+"/stickers/"+stickerID, nil, nil)
+}
+
+// PurgeSticker removes a custom sticker from a guild and deletes its image from storage.
+// The guild needs FeatureExpressionPurgeAllowed.
+func (c *Client) PurgeSticker(ctx context.Context, guildID, stickerID string) error {
+	return c.Do(ctx, http.MethodDelete, guildPath(guildID)+"/stickers/"+stickerID+"?purge=true", nil, nil)
 }
