@@ -103,3 +103,13 @@ func TestDecodeMemberLists(t *testing.T) {
 		t.Errorf("got %+v", tl)
 	}
 }
+
+func TestDecodeGuildHealth(t *testing.T) {
+	e, err := fluxer.Decode("GUILD_HEALTH_UPDATE", json.RawMessage(`{"guild_id":"3","degraded":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h := e.(*fluxer.GuildHealthUpdate); h.GuildID != "3" || !h.Degraded {
+		t.Errorf("got %+v", h)
+	}
+}

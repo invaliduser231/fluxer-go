@@ -208,6 +208,16 @@ type ThreadMembersUpdate struct {
 	RemovedMemberIDs []string       `json:"removed_member_ids,omitempty"`
 }
 
+// GuildHealthUpdate is the GUILD_HEALTH_UPDATE dispatch. Degraded is true
+// while the gateway process of the guild takes more than two seconds to answer
+// health probes, so events for the guild may arrive late, and false again once
+// it answers within half a second. Fluxer sends it on changes and, for guilds
+// that are degraded, after READY.
+type GuildHealthUpdate struct {
+	GuildID  string `json:"guild_id"`
+	Degraded bool   `json:"degraded"`
+}
+
 // GuildMemberAdd is the GUILD_MEMBER_ADD dispatch.
 type GuildMemberAdd struct{ Member }
 
@@ -499,6 +509,7 @@ func (ThreadDelete) EventName() string               { return "THREAD_DELETE" }
 func (ThreadListSync) EventName() string             { return "THREAD_LIST_SYNC" }
 func (ThreadMemberUpdate) EventName() string         { return "THREAD_MEMBER_UPDATE" }
 func (ThreadMembersUpdate) EventName() string        { return "THREAD_MEMBERS_UPDATE" }
+func (GuildHealthUpdate) EventName() string          { return "GUILD_HEALTH_UPDATE" }
 func (GuildMemberAdd) EventName() string             { return "GUILD_MEMBER_ADD" }
 func (GuildMemberUpdate) EventName() string          { return "GUILD_MEMBER_UPDATE" }
 func (GuildMemberRemove) EventName() string          { return "GUILD_MEMBER_REMOVE" }
@@ -553,6 +564,7 @@ func init() {
 		func() Event { return &ThreadCreate{} }, func() Event { return &ThreadUpdate{} },
 		func() Event { return &ThreadDelete{} }, func() Event { return &ThreadListSync{} },
 		func() Event { return &ThreadMemberUpdate{} }, func() Event { return &ThreadMembersUpdate{} },
+		func() Event { return &GuildHealthUpdate{} },
 		func() Event { return &GuildMemberAdd{} }, func() Event { return &GuildMemberUpdate{} },
 		func() Event { return &GuildMemberRemove{} }, func() Event { return &GuildMembersChunk{} },
 		func() Event { return &GuildBanAdd{} }, func() Event { return &GuildBanRemove{} },
