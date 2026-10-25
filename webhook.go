@@ -17,16 +17,27 @@ const (
 
 // Webhook is a Fluxer webhook. ExecuteWebhook and the methods ending in
 // WithToken need ID and Token; ParseWebhookURL extracts both from a webhook
-// URL.
+// URL. SourceGuild and SourceChannel name the followed announcement channel of
+// a WebhookChannelFollower webhook while its creator can see it.
 type Webhook struct {
-	ID        string `json:"id"`
-	GuildID   string `json:"guild_id,omitempty"`
-	ChannelID string `json:"channel_id"`
-	Name      string `json:"name"`
-	Avatar    string `json:"avatar,omitempty"`
-	Type      int    `json:"type"`
-	Token     string `json:"token,omitempty"`
-	User      *User  `json:"user,omitempty"`
+	ID            string         `json:"id"`
+	GuildID       string         `json:"guild_id,omitempty"`
+	ChannelID     string         `json:"channel_id"`
+	Name          string         `json:"name"`
+	Avatar        string         `json:"avatar,omitempty"`
+	Type          int            `json:"type"`
+	Token         string         `json:"token,omitempty"`
+	User          *User          `json:"user,omitempty"`
+	SourceGuild   *WebhookSource `json:"source_guild,omitempty"`
+	SourceChannel *WebhookSource `json:"source_channel,omitempty"`
+}
+
+// WebhookSource is the guild or channel a follower webhook copies messages from.
+// Icon is only set for guilds.
+type WebhookSource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Icon string `json:"icon,omitempty"`
 }
 
 // WebhookEdit holds the changes for ModifyWebhook. Nil fields are left
