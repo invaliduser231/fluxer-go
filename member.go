@@ -21,6 +21,8 @@ type Member struct {
 	Mute                       bool       `json:"mute,omitempty"`
 	Deaf                       bool       `json:"deaf,omitempty"`
 	CommunicationDisabledUntil *time.Time `json:"communication_disabled_until,omitempty"`
+	ProfileFlags               int        `json:"profile_flags,omitempty"`
+	MentionFlags               int        `json:"mention_flags,omitempty"`
 	GuildID                    string     `json:"guild_id,omitempty"`
 }
 
@@ -50,11 +52,35 @@ func MemberAvatarURL(media, guildID, userID, hash string) string {
 	return media + "/guilds/" + guildID + "/users/" + userID + "/avatars/" + hash + ".webp"
 }
 
+// Reply mention preferences for Member.MentionFlags and User.MentionFlags: whether the
+// user wants to be pinged when someone replies to them.
+const (
+	MentionNoPreference = 0
+	MentionPreferred    = 1
+	MentionNotPreferred = 2
+)
+
+// Profile flags for Member.ProfileFlags, set when the guild avatar or banner of the member
+// is unset.
+const (
+	MemberAvatarUnset = 1 << 0
+	MemberBannerUnset = 1 << 1
+)
+
 // MemberEdit holds the fields to change on a member. Only non-nil fields are sent.
 // CommunicationDisabledUntil cannot be cleared through this struct; use SetTimeout with
 // a zero time to lift a timeout. ChannelID moves the member to another voice channel.
+// Avatar, Banner, Bio, Pronouns and AccentColor set the guild profile, Avatar and Banner
+// as data URIs; they are mostly useful for the bot's own profile with ModifyCurrentMember.
 type MemberEdit struct {
 	Nick                       *string   `json:"nick,omitempty"`
+	Avatar                     *string   `json:"avatar,omitempty"`
+	Banner                     *string   `json:"banner,omitempty"`
+	Bio                        *string   `json:"bio,omitempty"`
+	Pronouns                   *string   `json:"pronouns,omitempty"`
+	AccentColor                *int      `json:"accent_color,omitempty"`
+	ProfileFlags               *int      `json:"profile_flags,omitempty"`
+	MentionFlags               *int      `json:"mention_flags,omitempty"`
 	Roles                      *[]string `json:"roles,omitempty"`
 	Mute                       *bool     `json:"mute,omitempty"`
 	Deaf                       *bool     `json:"deaf,omitempty"`

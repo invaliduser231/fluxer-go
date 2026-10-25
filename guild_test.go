@@ -196,3 +196,19 @@ func TestSearchMembersByAccountAge(t *testing.T) {
 		t.Errorf("got %+v", s)
 	}
 }
+
+func TestModifyCurrentMemberProfile(t *testing.T) {
+	srv, c := guildSetup(t)
+	bio, color, pref := "Releases and help", 0x146b63, fluxer.MentionNotPreferred
+	m, err := c.ModifyCurrentMember(context.Background(), "3", fluxer.MemberEdit{Bio: &bio, AccentColor: &color, MentionFlags: &pref})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.AccentColor == nil || *m.AccentColor != color || m.MentionFlags != pref {
+		t.Errorf("got %+v", m)
+	}
+	reqs := srv.Requests()
+	if body := reqs[len(reqs)-1].Body; !strings.Contains(body, `"bio":"Releases and help"`) {
+		t.Errorf("body %s", body)
+	}
+}

@@ -223,6 +223,12 @@ func (s *Server) memberRoutes(withGuild func(func(http.ResponseWriter, *http.Req
 		if raw, ok := body["roles"]; ok {
 			_ = json.Unmarshal(raw, &m.Roles)
 		}
+		if raw, ok := body["accent_color"]; ok {
+			_ = json.Unmarshal(raw, &m.AccentColor)
+		}
+		if raw, ok := body["mention_flags"]; ok {
+			_ = json.Unmarshal(raw, &m.MentionFlags)
+		}
 		if raw, ok := body["communication_disabled_until"]; ok {
 			var until *time.Time
 			_ = json.Unmarshal(raw, &until)
