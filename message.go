@@ -175,12 +175,16 @@ const (
 	ReferenceForward = 1
 )
 
-// MessageReference points at another message, for replies and forwards.
+// MessageReference points at another message, for replies and forwards. A
+// forward can be limited to some of the original's media with AttachmentIDs and
+// EmbedIndices.
 type MessageReference struct {
-	MessageID string `json:"message_id,omitempty"`
-	ChannelID string `json:"channel_id,omitempty"`
-	GuildID   string `json:"guild_id,omitempty"`
-	Type      int    `json:"type,omitempty"`
+	MessageID     string   `json:"message_id,omitempty"`
+	ChannelID     string   `json:"channel_id,omitempty"`
+	GuildID       string   `json:"guild_id,omitempty"`
+	Type          int      `json:"type,omitempty"`
+	AttachmentIDs []string `json:"attachment_ids,omitempty"`
+	EmbedIndices  []int    `json:"embed_indices,omitempty"`
 }
 
 // AllowedMentions limits which mentions in a message notify anyone. Parse and RepliedUser
@@ -282,6 +286,14 @@ func (c *Client) SendText(ctx context.Context, channelID, content string) (*Mess
 func (c *Client) Reply(ctx context.Context, to *Message, m MessageSend) (*Message, error) {
 	m.MessageReference = &MessageReference{MessageID: to.ID, ChannelID: to.ChannelID, GuildID: to.GuildID}
 	return c.SendMessage(ctx, to.ChannelID, m)
+}
+
+// Forward forwards m to channelID. A forward carries no content of its own;
+// Fluxer copies the original into the new message's MessageSnapshots.
+func (c *Client) Forward(ctx context.Context, m *Message, channelID string) (*Message, error) {
+	return c.SendMessage(ctx, channelID, MessageSend{MessageReference: &MessageReference{
+		Type: ReferenceForward, MessageID: m.ID, ChannelID: m.ChannelID, GuildID: m.GuildID,
+	}})
 }
 
 // EditMessage applies m to a message and returns the updated message.

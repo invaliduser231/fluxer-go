@@ -30,6 +30,14 @@ To answer a message, use `Reply`. It fills in the message reference:
 client.Reply(ctx, m, fluxer.MessageSend{Content: "Done."})
 ```
 
+`Forward` sends a message on to another channel:
+
+```go
+client.Forward(ctx, m, logChannelID)
+```
+
+A forward has no content of its own. Fluxer copies the original into `MessageSnapshots`, so a bot that reads forwards finds the text, embeds and attachments there, and `MessageReference` says where the original came from. To forward only some of the media, set `AttachmentIDs` or `EmbedIndices` on a `MessageReference` with `Type: fluxer.ReferenceForward` and send it with `SendMessage`.
+
 `SendMessage` adds a nonce when you don't set one. With a nonce Fluxer recognizes a repeated send, so the client can retry after a timeout or a 503 without posting the message twice.
 
 ## Editing and deleting

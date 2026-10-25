@@ -333,3 +333,28 @@ func TestDiscoverKeepsHTTPSOrigins(t *testing.T) {
 		t.Errorf("plain origin: %v", err)
 	}
 }
+
+func TestForward(t *testing.T) {
+	srv, c := setup(t)
+	ctx := context.Background()
+	src := fluxer.Message{ID: "5", ChannelID: "1", GuildID: "9", Content: "release notes", Mentions: []fluxer.User{{ID: "7"}}}
+	srv.AddMessage(src)
+	fwd, err := c.Forward(ctx, &src, "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fwd.Content != "" || len(fwd.MessageSnapshots) != 1 || fwd.MessageSnapshots[0].Content != "release notes" ||
+		fwd.MessageSnapshots[0].Mentions[0] != "7" || fwd.MessageReference.Type != fluxer.ReferenceForward {
+		t.Errorf("got %+v", fwd)
+	}
+	again, err := c.Forward(ctx, fwd, "3")
+	if err != nil || again.MessageSnapshots[0].Content != "release notes" {
+		t.Errorf("forward of a forward: %+v, %v", again, err)
+	}
+	_, err = c.SendMessage(ctx, "2", fluxer.MessageSend{Content: "hi", MessageReference: &fluxer.MessageReference{
+		Type: fluxer.ReferenceForward, MessageID: "5", ChannelID: "1",
+	}})
+	if fluxer.ErrorCode(err) != "INVALID_FORM_BODY" {
+		t.Errorf("got %v", err)
+	}
+}

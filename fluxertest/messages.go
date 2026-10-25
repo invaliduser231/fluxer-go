@@ -29,6 +29,30 @@ func (s *Server) Messages(channelID string) []fluxer.Message {
 	return slices.Clone(s.messages[channelID])
 }
 
+func (s *Server) find(channel, id string) (fluxer.Message, bool) {
+	for _, m := range s.messages[channel] {
+		if m.ID == id {
+			return m, true
+		}
+	}
+	return fluxer.Message{}, false
+}
+
+func snapshot(m fluxer.Message) fluxer.MessageSnapshot {
+	if len(m.MessageSnapshots) > 0 {
+		return m.MessageSnapshots[0]
+	}
+	snap := fluxer.MessageSnapshot{
+		Content: m.Content, Timestamp: m.Timestamp, EditedTimestamp: m.EditedTimestamp, MentionRoles: m.MentionRoles,
+		MentionChannels: m.MentionChannels, Embeds: m.Embeds, Attachments: m.Attachments, Stickers: m.Stickers,
+		Type: m.Type, Flags: m.Flags,
+	}
+	for _, u := range m.Mentions {
+		snap.Mentions = append(snap.Mentions, u.ID)
+	}
+	return snap
+}
+
 func (s *Server) messageRoutes() {
 	update := func(channel, id string, f func(m *fluxer.Message)) (fluxer.Message, bool) {
 		s.mu.Lock()
@@ -51,7 +75,21 @@ func (s *Server) messageRoutes() {
 			Embeds: body.Embeds, Flags: body.Flags, Nonce: body.Nonce, MessageReference: body.MessageReference,
 			Timestamp: time.Now().UTC(),
 		}
-		if m.MessageReference != nil {
+		switch ref := m.MessageReference; {
+		case ref != nil && ref.Type == fluxer.ReferenceForward:
+			if body.Content != "" || len(body.Embeds) > 0 || len(files) > 0 || len(body.StickerIDs) > 0 {
+				s.mu.Unlock()
+				writeError(w, http.StatusBadRequest, "INVALID_FORM_BODY", "Forwarded messages cannot contain content")
+				return
+			}
+			src, ok := s.find(ref.ChannelID, ref.MessageID)
+			if !ok {
+				s.mu.Unlock()
+				unknown(w)
+				return
+			}
+			m.MessageSnapshots = []fluxer.MessageSnapshot{snapshot(src)}
+		case ref != nil:
 			m.Type = fluxer.MessageReply
 		}
 		m.Attachments = s.stored(m.ChannelID, files)
