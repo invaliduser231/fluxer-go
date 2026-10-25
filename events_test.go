@@ -113,3 +113,16 @@ func TestDecodeGuildHealth(t *testing.T) {
 		t.Errorf("got %+v", h)
 	}
 }
+
+func TestDecodeAttachment(t *testing.T) {
+	raw := `{"id":"5","channel_id":"2","author":{"id":"7"},"content":"","attachments":[{"id":"9","filename":"memo.ogg","size":120,"flags":8,
+		"content_hash":"h1","placeholder":"cGg=","nsfw":false,"duration":4,"waveform":"AAEC","expires_at":"2026-10-25T10:00:00Z","expired":false}]}`
+	e, err := fluxer.Decode("MESSAGE_CREATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := e.(*fluxer.MessageCreate).Attachments[0]
+	if a.Flags&fluxer.AttachmentSpoiler == 0 || a.ContentHash != "h1" || a.Waveform != "AAEC" || a.Duration != 4 || a.ExpiresAt == nil || a.ExpiresAt.Day() != 25 {
+		t.Errorf("got %+v", a)
+	}
+}

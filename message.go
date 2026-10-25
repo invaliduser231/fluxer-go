@@ -102,20 +102,36 @@ func (m Message) URL(webapp string) string {
 	return webapp + "/channels/" + guild + "/" + m.ChannelID + "/" + m.ID
 }
 
-// Attachment is a file attached to a message. Size is in bytes.
+// Attachment flags for Attachment.Flags and File.Flags.
+const (
+	AttachmentSpoiler       = 1 << 3
+	AttachmentExplicitMedia = 1 << 4
+	AttachmentAnimated      = 1 << 5
+)
+
+// Attachment is a file attached to a message. Size is in bytes and Duration in
+// seconds. URL stops working at ExpiresAt; Client.RefreshAttachmentURLs gets a
+// fresh one. Placeholder is a small base64 preview image and Waveform the base64
+// waveform of a voice message.
 type Attachment struct {
-	ID          string `json:"id"`
-	Filename    string `json:"filename"`
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
-	ContentType string `json:"content_type,omitempty"`
-	Size        int64  `json:"size"`
-	URL         string `json:"url,omitempty"`
-	ProxyURL    string `json:"proxy_url,omitempty"`
-	Width       int    `json:"width,omitempty"`
-	Height      int    `json:"height,omitempty"`
-	Flags       int    `json:"flags,omitempty"`
-	Duration    int    `json:"duration,omitempty"`
+	ID          string     `json:"id"`
+	Filename    string     `json:"filename"`
+	Title       string     `json:"title,omitempty"`
+	Description string     `json:"description,omitempty"`
+	ContentType string     `json:"content_type,omitempty"`
+	ContentHash string     `json:"content_hash,omitempty"`
+	Size        int64      `json:"size"`
+	URL         string     `json:"url,omitempty"`
+	ProxyURL    string     `json:"proxy_url,omitempty"`
+	Width       int        `json:"width,omitempty"`
+	Height      int        `json:"height,omitempty"`
+	Placeholder string     `json:"placeholder,omitempty"`
+	Flags       int        `json:"flags,omitempty"`
+	NSFW        bool       `json:"nsfw,omitempty"`
+	Duration    int        `json:"duration,omitempty"`
+	Waveform    string     `json:"waveform,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	Expired     bool       `json:"expired,omitempty"`
 }
 
 // ChannelMention is a channel referenced in a message's content.
