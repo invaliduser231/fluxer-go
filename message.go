@@ -26,14 +26,17 @@ const (
 )
 
 // Message flags, used as bits in Message.Flags and MessageSend.Flags.
+// FlagFailedToMentionRolesInThread marks a thread message whose role mentions did not
+// reach every member of the roles.
 const (
-	FlagCrossposted           = 1 << 0
-	FlagIsCrosspost           = 1 << 1
-	FlagSuppressEmbeds        = 1 << 2
-	FlagSourceMessageDeleted  = 1 << 3
-	FlagHasThread             = 1 << 5
-	FlagSuppressNotifications = 1 << 12
-	FlagVoiceMessage          = 1 << 13
+	FlagCrossposted                  = 1 << 0
+	FlagIsCrosspost                  = 1 << 1
+	FlagSuppressEmbeds               = 1 << 2
+	FlagSourceMessageDeleted         = 1 << 3
+	FlagHasThread                    = 1 << 5
+	FlagFailedToMentionRolesInThread = 1 << 8
+	FlagSuppressNotifications        = 1 << 12
+	FlagVoiceMessage                 = 1 << 13
 )
 
 // Message is a message in a channel. GuildID is empty for messages in DMs, and Member is
