@@ -88,3 +88,23 @@ func TestRequestGuildMembers(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func TestSubscribeThreads(t *testing.T) {
+	srv, _ := setup(t)
+	r := fluxer.NewRouter()
+	ready := make(chan struct{}, 1)
+	fluxer.On(r, func(*fluxer.Ready) { ready <- struct{}{} })
+	s := &fluxer.Session{URL: srv.GatewayURL(), Token: srv.Token, Handler: r.Handle}
+	runSession(t, s)
+	<-ready
+
+	on, none := true, []string{}
+	if err := s.Subscribe(context.Background(), map[string]fluxer.GuildSubscription{"3": {Threads: &on, ThreadMemberLists: &none}}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "lazy request", func() bool { return len(srv.Stats().Commands) > 0 })
+	c := srv.Stats().Commands[0]
+	if c.Op != 14 || !strings.Contains(string(c.D), `"threads":true`) || !strings.Contains(string(c.D), `"thread_member_lists":[]`) {
+		t.Errorf("got op %d %s", c.Op, c.D)
+	}
+}

@@ -51,6 +51,16 @@ The answers come back as events (`GuildMembersChunk`, `GuildCountsUpdate`). If y
 
 Fluxer allows five presence updates per 20 seconds on one connection and drops the rest without telling you.
 
+`Subscribe` asks for the live member list of a channel, the way the sidebar in the app shows it. Fluxer sends the requested ranges as `GuildMemberListUpdate` and repeats them whenever the list changes:
+
+```go
+session.Subscribe(ctx, map[string]fluxer.GuildSubscription{
+	guildID: {MemberListChannels: map[string][][2]int{channelID: {{0, 99}}}},
+})
+```
+
+`Threads` in the same struct subscribes to all threads the bot can see, and `ThreadMemberLists` to the member lists of up to ten threads, which arrive as `ThreadMemberListUpdate`.
+
 ## Surviving a restart
 
 Fluxer keeps a disconnected session for 60 seconds. If your process restarts within that window, it can resume instead of starting over:

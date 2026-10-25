@@ -47,14 +47,19 @@ type RequestMembers struct {
 }
 
 // GuildSubscription is what the session subscribes to in one guild through Subscribe.
-// MemberListChannels maps channel IDs to member list index ranges. Nil pointer fields are left out
-// of the request.
+// MemberListChannels maps channel IDs to member list index ranges, answered with
+// GuildMemberListUpdate. Threads subscribes to events and messages of every thread the session can
+// view. ThreadMemberLists names up to 10 threads whose member lists arrive as
+// ThreadMemberListUpdate; it replaces the earlier list, and an empty slice clears it. Nil pointer
+// fields are left out of the request.
 type GuildSubscription struct {
 	Active             *bool               `json:"active,omitempty"`
 	Sync               *bool               `json:"sync,omitempty"`
 	Typing             *bool               `json:"typing,omitempty"`
 	MemberListChannels map[string][][2]int `json:"member_list_channels,omitempty"`
 	Members            []string            `json:"members,omitempty"`
+	Threads            *bool               `json:"threads,omitempty"`
+	ThreadMemberLists  *[]string           `json:"thread_member_lists,omitempty"`
 }
 
 func (s *Session) setLive(conn *wire) {
