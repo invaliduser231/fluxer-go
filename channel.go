@@ -238,13 +238,14 @@ type ChannelEdit struct {
 	AppliedTags                   *[]string          `json:"applied_tags,omitempty"`
 }
 
-// ChannelPosition moves one channel in ModifyChannelPositions. Nil Position and ParentID
-// are not sent.
+// ChannelPosition moves one channel in ModifyChannelPositions. PrecedingSiblingID places it
+// directly after that channel, as an alternative to Position. Nil pointer fields are not sent.
 type ChannelPosition struct {
-	ID              string  `json:"id"`
-	Position        *int    `json:"position,omitempty"`
-	ParentID        *string `json:"parent_id,omitempty"`
-	LockPermissions bool    `json:"lock_permissions,omitempty"`
+	ID                 string  `json:"id"`
+	Position           *int    `json:"position,omitempty"`
+	ParentID           *string `json:"parent_id,omitempty"`
+	PrecedingSiblingID *string `json:"preceding_sibling_id,omitempty"`
+	LockPermissions    bool    `json:"lock_permissions,omitempty"`
 }
 
 // FollowedChannel is the result of FollowChannel: the target channel and the webhook
