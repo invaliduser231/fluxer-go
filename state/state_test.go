@@ -152,3 +152,27 @@ func TestPinsUpdateKeepsConcurrentChannelUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestThreadMembers(t *testing.T) {
+	c := setup(t)
+	c.Apply(&fluxer.ThreadMembersUpdate{ID: "50", GuildID: "3", MemberCount: 2, AddedMembers: []fluxer.ThreadMember{
+		{ID: "50", UserID: "1000", Flags: 1},
+		{ID: "50", UserID: "8", Member: &fluxer.Member{User: &fluxer.User{ID: "8", Username: "ben"}}},
+	}})
+	th, _ := c.Channel("50")
+	if th.MemberCount != 2 || th.Member == nil || th.Member.Flags != 1 {
+		t.Fatalf("got %+v", th)
+	}
+	if m, ok := c.Member("3", "8"); !ok || m.User.Username != "ben" {
+		t.Errorf("member %+v", m)
+	}
+	c.Apply(&fluxer.ThreadMemberUpdate{ThreadMember: fluxer.ThreadMember{ID: "50", UserID: "1000", Flags: 2, Muted: true}, GuildID: "3"})
+	if th, _ := c.Channel("50"); !th.Member.Muted || th.Member.Flags != 2 {
+		t.Errorf("got %+v", th.Member)
+	}
+	c.Apply(&fluxer.ThreadMembersUpdate{ID: "50", GuildID: "3", MemberCount: 1, RemovedMemberIDs: []string{"1000"}})
+	if th, _ := c.Channel("50"); th.Member != nil || th.MemberCount != 1 {
+		t.Errorf("got %+v", th)
+	}
+
+}

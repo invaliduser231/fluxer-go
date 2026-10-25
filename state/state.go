@@ -118,6 +118,10 @@ func eventGuild(e fluxer.Event) string {
 		return e.GuildID
 	case *fluxer.ThreadListSync:
 		return e.GuildID
+	case *fluxer.ThreadMemberUpdate:
+		return e.GuildID
+	case *fluxer.ThreadMembersUpdate:
+		return e.GuildID
 	case *fluxer.MessageCreate:
 		return e.GuildID
 	case *fluxer.PassiveUpdates:
@@ -276,6 +280,32 @@ func (c *Cache) apply(e fluxer.Event) {
 		for _, ch := range e.Threads {
 			if ch.GuildID == "" {
 				ch.GuildID = e.GuildID
+			}
+			c.putChannel(ch)
+		}
+	case *fluxer.ThreadMemberUpdate:
+		if ch, ok := c.channel(e.ID); ok {
+			tm := e.ThreadMember
+			ch.Member = &tm
+			c.putChannel(ch)
+		}
+	case *fluxer.ThreadMembersUpdate:
+		self := c.Self().ID
+		for _, tm := range e.AddedMembers {
+			if tm.Member != nil && e.GuildID != "" {
+				c.putMember(e.GuildID, *tm.Member)
+			}
+		}
+		if ch, ok := c.channel(e.ID); ok {
+			ch.MemberCount = e.MemberCount
+			for _, tm := range e.AddedMembers {
+				if tm.UserID == self {
+					tm.Member = nil
+					ch.Member = &tm
+				}
+			}
+			if slices.Contains(e.RemovedMemberIDs, self) {
+				ch.Member = nil
 			}
 			c.putChannel(ch)
 		}
