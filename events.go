@@ -340,13 +340,15 @@ type MessageReactionAddMany struct {
 	Reactions []ReactionAddition `json:"reactions"`
 }
 
-// MessageReactionRemove is the MESSAGE_REACTION_REMOVE dispatch.
+// MessageReactionRemove is the MESSAGE_REACTION_REMOVE dispatch. Member is set in guild
+// channels.
 type MessageReactionRemove struct {
 	UserID    string        `json:"user_id"`
 	ChannelID string        `json:"channel_id"`
 	MessageID string        `json:"message_id"`
 	GuildID   string        `json:"guild_id,omitempty"`
 	Emoji     ReactionEmoji `json:"emoji"`
+	Member    *Member       `json:"member,omitempty"`
 }
 
 // MessageReactionRemoveAll is the MESSAGE_REACTION_REMOVE_ALL dispatch.
