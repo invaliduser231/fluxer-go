@@ -10,10 +10,12 @@ const (
 	opRequestChannelMemberCounts = 16
 )
 
-// Flags for Session.Flags, sent with IDENTIFY.
+// Flags for Session.Flags, sent with IDENTIFY. FlagGuildVisits makes the session receive
+// the guilds the account is visiting without being a member.
 const (
 	FlagDebounceMessageReactions = 1 << 1
 	FlagChannelThreads           = 1 << 2
+	FlagGuildVisits              = 1 << 3
 )
 
 // Presence status values for StatusUpdate and Presence.
