@@ -7,17 +7,29 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"time"
 )
 
 // Guild is a Fluxer guild (server). Roles, Emojis, Stickers and Channels are only filled
 // in by endpoints and events that include them, and the count fields depend on the
-// request, for example GuildQuery.WithCounts.
+// request, for example GuildQuery.WithCounts. MessageHistoryCutoff limits how far back
+// members without Read Message History can read. ThreadsActive is true when threads,
+// forums and media channels are enabled, Visiting when the current user visits the guild
+// without being a member.
 type Guild struct {
 	ID                          string      `json:"id"`
 	Name                        string      `json:"name"`
 	Icon                        string      `json:"icon,omitempty"`
 	Banner                      string      `json:"banner,omitempty"`
+	BannerWidth                 int         `json:"banner_width,omitempty"`
+	BannerHeight                int         `json:"banner_height,omitempty"`
 	Splash                      string      `json:"splash,omitempty"`
+	SplashWidth                 int         `json:"splash_width,omitempty"`
+	SplashHeight                int         `json:"splash_height,omitempty"`
+	SplashCardAlignment         int         `json:"splash_card_alignment,omitempty"`
+	EmbedSplash                 string      `json:"embed_splash,omitempty"`
+	EmbedSplashWidth            int         `json:"embed_splash_width,omitempty"`
+	EmbedSplashHeight           int         `json:"embed_splash_height,omitempty"`
 	VanityURLCode               string      `json:"vanity_url_code,omitempty"`
 	OwnerID                     string      `json:"owner_id"`
 	SystemChannelID             string      `json:"system_channel_id,omitempty"`
@@ -30,9 +42,12 @@ type Guild struct {
 	MFALevel                    int         `json:"mfa_level,omitempty"`
 	NSFWLevel                   int         `json:"nsfw_level,omitempty"`
 	NSFW                        bool        `json:"nsfw,omitempty"`
+	ContentWarningLevel         int         `json:"content_warning_level,omitempty"`
+	ContentWarningText          string      `json:"content_warning_text,omitempty"`
 	ExplicitContentFilter       int         `json:"explicit_content_filter,omitempty"`
 	DefaultMessageNotifications int         `json:"default_message_notifications,omitempty"`
 	DisabledOperations          int         `json:"disabled_operations,omitempty"`
+	MessageHistoryCutoff        *time.Time  `json:"message_history_cutoff,omitempty"`
 	Permissions                 Permissions `json:"permissions,omitempty"`
 	Roles                       []Role      `json:"roles,omitempty"`
 	Emojis                      []Emoji     `json:"emojis,omitempty"`
@@ -42,6 +57,8 @@ type Guild struct {
 	OnlineCount                 int         `json:"online_count,omitempty"`
 	ApproximateMemberCount      int         `json:"approximate_member_count,omitempty"`
 	ApproximatePresenceCount    int         `json:"approximate_presence_count,omitempty"`
+	ThreadsActive               bool        `json:"threads_active,omitempty"`
+	Visiting                    bool        `json:"visiting,omitempty"`
 }
 
 // HasFeature reports whether the guild has the named feature flag.

@@ -141,3 +141,17 @@ func TestDecodeForumChannel(t *testing.T) {
 		t.Errorf("got %+v", c.Channel)
 	}
 }
+
+func TestDecodeGuildUpdate(t *testing.T) {
+	raw := `{"id":"3","name":"Test","owner_id":"1","threads_active":true,"content_warning_level":1,"content_warning_text":"Spoilers",
+		"message_history_cutoff":"2026-01-01T00:00:00Z","banner_width":960,"splash_card_alignment":2,"disabled_operations":16}`
+	e, err := fluxer.Decode("GUILD_UPDATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := e.(*fluxer.GuildUpdate)
+	if !g.ThreadsActive || g.ContentWarningText != "Spoilers" || g.MessageHistoryCutoff == nil || g.BannerWidth != 960 ||
+		g.SplashCardAlignment != fluxer.SplashRight || g.DisabledOperations&fluxer.OperationSendMessage == 0 {
+		t.Errorf("got %+v", g.Guild)
+	}
+}
