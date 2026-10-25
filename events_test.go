@@ -155,3 +155,16 @@ func TestDecodeGuildUpdate(t *testing.T) {
 		t.Errorf("got %+v", g.Guild)
 	}
 }
+
+func TestDecodeLinkEmbed(t *testing.T) {
+	raw := `{"id":"5","channel_id":"2","author":{"id":"7"},"content":"","embeds":[{"type":"link","url":"https://example.com","html":"<iframe></iframe>","html_width":640,
+		"image":{"url":"https://example.com/a.gif","flags":32,"duration":3,"placeholder":"cGg="},"children":[{"type":"image","url":"https://example.com/b.png"}]}]}`
+	e, err := fluxer.Decode("MESSAGE_UPDATE", json.RawMessage(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	em := e.(*fluxer.MessageUpdate).Embeds[0]
+	if em.HTMLWidth != 640 || em.Image.Flags&fluxer.AttachmentAnimated == 0 || em.Image.Duration != 3 || len(em.Children) != 1 || em.Children[0].Type != "image" {
+		t.Errorf("got %+v", em)
+	}
+}

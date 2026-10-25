@@ -3,7 +3,9 @@ package fluxer
 import "time"
 
 // Embed is rich content attached to a message. Timestamp is an RFC 3339 string; use
-// SetTimestamp to fill it from a time.Time. Color is nil when no color is set.
+// SetTimestamp to fill it from a time.Time. Color is nil when no color is set. HTML, NSFW
+// and Children are only set on embeds Fluxer generates from links: HTML is sanitized
+// oEmbed markup and Children holds nested embeds of the same link.
 type Embed struct {
 	Type        string         `json:"type,omitempty"`
 	Title       string         `json:"title,omitempty"`
@@ -19,6 +21,11 @@ type Embed struct {
 	Footer      *EmbedFooter   `json:"footer,omitempty"`
 	Provider    *EmbedProvider `json:"provider,omitempty"`
 	Fields      []EmbedField   `json:"fields,omitempty"`
+	HTML        string         `json:"html,omitempty"`
+	HTMLWidth   int            `json:"html_width,omitempty"`
+	HTMLHeight  int            `json:"html_height,omitempty"`
+	NSFW        bool           `json:"nsfw,omitempty"`
+	Children    []Embed        `json:"children,omitempty"`
 }
 
 // EmbedAuthor is the author line of an embed.
@@ -29,15 +36,20 @@ type EmbedAuthor struct {
 	ProxyIconURL string `json:"proxy_icon_url,omitempty"`
 }
 
-// EmbedMedia is an image, thumbnail, video or audio item in an embed. ProxyURL and the
-// dimensions are filled in by the server.
+// EmbedMedia is an image, thumbnail, video or audio item in an embed. ProxyURL, the
+// dimensions, ContentHash, Placeholder, Duration in seconds and Flags, which uses the
+// AttachmentExplicitMedia and AttachmentAnimated bits, are filled in by the server.
 type EmbedMedia struct {
 	URL         string `json:"url"`
 	ProxyURL    string `json:"proxy_url,omitempty"`
 	ContentType string `json:"content_type,omitempty"`
+	ContentHash string `json:"content_hash,omitempty"`
 	Width       int    `json:"width,omitempty"`
 	Height      int    `json:"height,omitempty"`
 	Description string `json:"description,omitempty"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Duration    int    `json:"duration,omitempty"`
+	Flags       int    `json:"flags,omitempty"`
 }
 
 // EmbedFooter is the footer of an embed.
