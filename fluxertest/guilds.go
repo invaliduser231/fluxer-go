@@ -159,7 +159,13 @@ func (s *Server) guildRoutes() {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		ch := fluxer.Channel{
 			ID: s.newID(), GuildID: g.ID, Name: body.Name, Type: body.Type, Topic: body.Topic,
-			ParentID: body.ParentID, PermissionOverwrites: body.PermissionOverwrites,
+			ParentID: body.ParentID, PermissionOverwrites: body.PermissionOverwrites, Flags: body.Flags,
+			AvailableTags: body.AvailableTags, DefaultReactionEmoji: body.DefaultReactionEmoji,
+			DefaultThreadRateLimitPerUser: body.DefaultThreadRateLimitPerUser, DefaultSortOrder: body.DefaultSortOrder,
+			DefaultForumLayout: body.DefaultForumLayout, DefaultTagSetting: body.DefaultTagSetting,
+		}
+		for i := range ch.AvailableTags {
+			ch.AvailableTags[i].ID = s.newID()
 		}
 		s.Channels[ch.ID] = ch
 		writeJSON(w, ch)

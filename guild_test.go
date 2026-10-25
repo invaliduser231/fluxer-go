@@ -153,3 +153,23 @@ func TestWebhooks(t *testing.T) {
 		t.Error("expected error")
 	}
 }
+
+func TestCreateForum(t *testing.T) {
+	_, c := guildSetup(t)
+	order := fluxer.ForumSortCreationTime
+	ch, err := c.CreateChannel(context.Background(), "3", fluxer.NewChannel{
+		Name: "help", Type: fluxer.ChannelForum, Flags: fluxer.ChannelFlagRequireTag,
+		AvailableTags:        []fluxer.ForumTag{{Name: "bug"}, {Name: "solved", Moderated: true}},
+		DefaultReactionEmoji: &fluxer.DefaultReaction{EmojiName: "\U0001F44D"},
+		DefaultSortOrder:     &order, DefaultForumLayout: fluxer.ForumLayoutList, DefaultTagSetting: fluxer.TagsMatchAll,
+		DefaultThreadRateLimitPerUser: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ch.AvailableTags) != 2 || ch.AvailableTags[0].ID == "" || ch.DefaultSortOrder == nil || *ch.DefaultSortOrder != order ||
+		ch.DefaultForumLayout != fluxer.ForumLayoutList || ch.DefaultTagSetting != fluxer.TagsMatchAll || ch.DefaultThreadRateLimitPerUser != 10 ||
+		ch.Flags != fluxer.ChannelFlagRequireTag {
+		t.Errorf("got %+v", ch)
+	}
+}

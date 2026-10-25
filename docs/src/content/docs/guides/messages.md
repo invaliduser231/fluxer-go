@@ -132,3 +132,5 @@ post, err := client.CreatePost(ctx, forumID, fluxer.NewPost{
 ```
 
 `ArchiveThread`, `LockThread`, `ThreadMembers` and `ArchivedThreads` cover the rest. Forum tags are managed with `CreateForumTag`, `ModifyForumTag` and `DeleteForumTag`.
+
+A forum can be set up completely in `CreateChannel`: `AvailableTags`, `DefaultReactionEmoji`, `DefaultSortOrder`, `DefaultForumLayout` (`fluxer.ForumLayoutList` or `fluxer.ForumLayoutGrid`), `DefaultTagSetting` and the slowmode for new posts, `DefaultThreadRateLimitPerUser`. `ModifyChannel` changes the same settings later.

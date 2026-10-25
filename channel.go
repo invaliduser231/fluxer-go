@@ -172,45 +172,70 @@ type DefaultReaction struct {
 }
 
 // NewChannel is the request body for CreateChannel. Name and Type are always sent;
-// zero values of the other fields are omitted.
+// zero values of the other fields are omitted. The Default* fields, AvailableTags and
+// DefaultReactionEmoji set up a forum or media channel.
 type NewChannel struct {
-	Name                       string      `json:"name"`
-	Type                       int         `json:"type"`
-	Topic                      string      `json:"topic,omitempty"`
-	URL                        string      `json:"url,omitempty"`
-	ParentID                   string      `json:"parent_id,omitempty"`
-	Bitrate                    int         `json:"bitrate,omitempty"`
-	UserLimit                  int         `json:"user_limit,omitempty"`
-	RateLimitPerUser           int         `json:"rate_limit_per_user,omitempty"`
-	NSFW                       bool        `json:"nsfw,omitempty"`
-	PermissionOverwrites       []Overwrite `json:"permission_overwrites,omitempty"`
-	DefaultAutoArchiveDuration int         `json:"default_auto_archive_duration,omitempty"`
+	Name                          string           `json:"name"`
+	Type                          int              `json:"type"`
+	Topic                         string           `json:"topic,omitempty"`
+	URL                           string           `json:"url,omitempty"`
+	ParentID                      string           `json:"parent_id,omitempty"`
+	Bitrate                       int              `json:"bitrate,omitempty"`
+	UserLimit                     int              `json:"user_limit,omitempty"`
+	VoiceConnectionLimit          int              `json:"voice_connection_limit,omitempty"`
+	RateLimitPerUser              int              `json:"rate_limit_per_user,omitempty"`
+	NSFW                          bool             `json:"nsfw,omitempty"`
+	NSFWOverride                  *bool            `json:"nsfw_override,omitempty"`
+	ContentWarningLevel           int              `json:"content_warning_level,omitempty"`
+	ContentWarningText            string           `json:"content_warning_text,omitempty"`
+	PermissionOverwrites          []Overwrite      `json:"permission_overwrites,omitempty"`
+	Flags                         int              `json:"flags,omitempty"`
+	DefaultAutoArchiveDuration    int              `json:"default_auto_archive_duration,omitempty"`
+	DefaultThreadRateLimitPerUser int              `json:"default_thread_rate_limit_per_user,omitempty"`
+	AvailableTags                 []ForumTag       `json:"available_tags,omitempty"`
+	DefaultReactionEmoji          *DefaultReaction `json:"default_reaction_emoji,omitempty"`
+	DefaultSortOrder              *int             `json:"default_sort_order,omitempty"`
+	DefaultForumLayout            int              `json:"default_forum_layout,omitempty"`
+	DefaultTagSetting             string           `json:"default_tag_setting,omitempty"`
 }
 
 // ChannelEdit holds the fields to change on a channel or thread. Only non-nil fields are
 // sent, so a field cannot be reset to null through this struct. Archived, Locked,
-// Invitable, AutoArchiveDuration and AppliedTags apply to threads.
+// Invitable, AutoArchiveDuration and AppliedTags apply to threads, Icon, OwnerID and Nicks
+// to group DMs. Icon is a data URI.
 type ChannelEdit struct {
-	Name                       *string          `json:"name,omitempty"`
-	Type                       *int             `json:"type,omitempty"`
-	Topic                      *string          `json:"topic,omitempty"`
-	URL                        *string          `json:"url,omitempty"`
-	ParentID                   *string          `json:"parent_id,omitempty"`
-	Bitrate                    *int             `json:"bitrate,omitempty"`
-	UserLimit                  *int             `json:"user_limit,omitempty"`
-	RTCRegion                  *string          `json:"rtc_region,omitempty"`
-	RateLimitPerUser           *int             `json:"rate_limit_per_user,omitempty"`
-	NSFW                       *bool            `json:"nsfw,omitempty"`
-	PermissionOverwrites       *[]Overwrite     `json:"permission_overwrites,omitempty"`
-	Flags                      *int             `json:"flags,omitempty"`
-	DefaultAutoArchiveDuration *int             `json:"default_auto_archive_duration,omitempty"`
-	AvailableTags              *[]ForumTag      `json:"available_tags,omitempty"`
-	DefaultReactionEmoji       *DefaultReaction `json:"default_reaction_emoji,omitempty"`
-	Archived                   *bool            `json:"archived,omitempty"`
-	Locked                     *bool            `json:"locked,omitempty"`
-	Invitable                  *bool            `json:"invitable,omitempty"`
-	AutoArchiveDuration        *int             `json:"auto_archive_duration,omitempty"`
-	AppliedTags                *[]string        `json:"applied_tags,omitempty"`
+	Name                          *string            `json:"name,omitempty"`
+	Type                          *int               `json:"type,omitempty"`
+	Topic                         *string            `json:"topic,omitempty"`
+	URL                           *string            `json:"url,omitempty"`
+	ParentID                      *string            `json:"parent_id,omitempty"`
+	Bitrate                       *int               `json:"bitrate,omitempty"`
+	UserLimit                     *int               `json:"user_limit,omitempty"`
+	VoiceConnectionLimit          *int               `json:"voice_connection_limit,omitempty"`
+	RTCRegion                     *string            `json:"rtc_region,omitempty"`
+	RTCP2P                        *bool              `json:"rtc_p2p,omitempty"`
+	RateLimitPerUser              *int               `json:"rate_limit_per_user,omitempty"`
+	NSFW                          *bool              `json:"nsfw,omitempty"`
+	NSFWOverride                  *bool              `json:"nsfw_override,omitempty"`
+	ContentWarningLevel           *int               `json:"content_warning_level,omitempty"`
+	ContentWarningText            *string            `json:"content_warning_text,omitempty"`
+	PermissionOverwrites          *[]Overwrite       `json:"permission_overwrites,omitempty"`
+	Flags                         *int               `json:"flags,omitempty"`
+	Icon                          *string            `json:"icon,omitempty"`
+	OwnerID                       *string            `json:"owner_id,omitempty"`
+	Nicks                         *map[string]string `json:"nicks,omitempty"`
+	DefaultAutoArchiveDuration    *int               `json:"default_auto_archive_duration,omitempty"`
+	DefaultThreadRateLimitPerUser *int               `json:"default_thread_rate_limit_per_user,omitempty"`
+	AvailableTags                 *[]ForumTag        `json:"available_tags,omitempty"`
+	DefaultReactionEmoji          *DefaultReaction   `json:"default_reaction_emoji,omitempty"`
+	DefaultSortOrder              *int               `json:"default_sort_order,omitempty"`
+	DefaultForumLayout            *int               `json:"default_forum_layout,omitempty"`
+	DefaultTagSetting             *string            `json:"default_tag_setting,omitempty"`
+	Archived                      *bool              `json:"archived,omitempty"`
+	Locked                        *bool              `json:"locked,omitempty"`
+	Invitable                     *bool              `json:"invitable,omitempty"`
+	AutoArchiveDuration           *int               `json:"auto_archive_duration,omitempty"`
+	AppliedTags                   *[]string          `json:"applied_tags,omitempty"`
 }
 
 // ChannelPosition moves one channel in ModifyChannelPositions. Nil Position and ParentID
