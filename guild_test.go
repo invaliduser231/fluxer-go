@@ -3,6 +3,8 @@ package fluxer_test
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -171,5 +173,26 @@ func TestCreateForum(t *testing.T) {
 		ch.DefaultForumLayout != fluxer.ForumLayoutList || ch.DefaultTagSetting != fluxer.TagsMatchAll || ch.DefaultThreadRateLimitPerUser != 10 ||
 		ch.Flags != fluxer.ChannelFlagRequireTag {
 		t.Errorf("got %+v", ch)
+	}
+}
+
+func TestSearchMembersByAccountAge(t *testing.T) {
+	srv, c := setup(t)
+	var body string
+	srv.Handle("POST /v1/guilds/{guild}/members-search", func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		body = string(data)
+		_, _ = w.Write([]byte(`{"guild_id":"3","members":[{"id":"3:7","guild_id":"3","user_id":"7","username":"anna","discriminator":"0001","global_name":null,"nickname":null,
+			"role_ids":[],"joined_at":1761300000,"is_bot":false,"supplemental":{"join_source_type":1,"source_invite_code":"abc","inviter_id":"9"}}],"page_result_count":1,"total_result_count":1,"indexing":false}`))
+	})
+	p, err := c.SearchMembers(context.Background(), "3", fluxer.MemberSearch{UserCreatedAfter: 1761200000, JoinSourceTypes: []int{fluxer.JoinInvite}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body != `{"user_created_at_gte":1761200000,"join_source_type":[1]}` {
+		t.Errorf("body %s", body)
+	}
+	if s := p.Members[0].Supplemental; s.JoinSourceType == nil || *s.JoinSourceType != fluxer.JoinInvite || *s.SourceInviteCode != "abc" || *s.InviterID != "9" {
+		t.Errorf("got %+v", s)
 	}
 }

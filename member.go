@@ -64,31 +64,57 @@ type MemberEdit struct {
 	ConnectionID               *string   `json:"connection_id,omitempty"`
 }
 
+// Join sources for MemberSearch.JoinSourceTypes and MemberSearchExtra.JoinSourceType.
+const (
+	JoinCreator    = 0
+	JoinInvite     = 1
+	JoinVanityURL  = 2
+	JoinBotInvite  = 3
+	JoinForceAdded = 4
+	JoinDiscovery  = 6
+)
+
 // MemberSearch is the query for SearchMembers. Zero values are omitted, which leaves
 // paging, sorting and filtering to the server defaults. IsBot filters by bot accounts
-// when set.
+// when set. The time filters are inclusive Unix seconds: JoinedAfter and JoinedBefore
+// bound when the member joined, UserCreatedAfter and UserCreatedBefore how old the
+// account is.
 type MemberSearch struct {
-	Query     string   `json:"query,omitempty"`
-	Limit     int      `json:"limit,omitempty"`
-	Offset    int      `json:"offset,omitempty"`
-	RoleIDs   []string `json:"role_ids,omitempty"`
-	IsBot     *bool    `json:"is_bot,omitempty"`
-	SortBy    string   `json:"sort_by,omitempty"`
-	SortOrder string   `json:"sort_order,omitempty"`
+	Query             string   `json:"query,omitempty"`
+	Limit             int      `json:"limit,omitempty"`
+	Offset            int      `json:"offset,omitempty"`
+	RoleIDs           []string `json:"role_ids,omitempty"`
+	IsBot             *bool    `json:"is_bot,omitempty"`
+	JoinedAfter       int64    `json:"joined_at_gte,omitempty"`
+	JoinedBefore      int64    `json:"joined_at_lte,omitempty"`
+	UserCreatedAfter  int64    `json:"user_created_at_gte,omitempty"`
+	UserCreatedBefore int64    `json:"user_created_at_lte,omitempty"`
+	JoinSourceTypes   []int    `json:"join_source_type,omitempty"`
+	SourceInviteCodes []string `json:"source_invite_code,omitempty"`
+	SortBy            string   `json:"sort_by,omitempty"`
+	SortOrder         string   `json:"sort_order,omitempty"`
+}
+
+// MemberSearchExtra tells how a member found by SearchMembers joined.
+type MemberSearchExtra struct {
+	JoinSourceType   *int    `json:"join_source_type"`
+	SourceInviteCode *string `json:"source_invite_code"`
+	InviterID        *string `json:"inviter_id"`
 }
 
 // MemberSearchResult is a single member entry returned by SearchMembers.
 type MemberSearchResult struct {
-	ID            string   `json:"id"`
-	GuildID       string   `json:"guild_id"`
-	UserID        string   `json:"user_id"`
-	Username      string   `json:"username"`
-	Discriminator string   `json:"discriminator"`
-	GlobalName    *string  `json:"global_name"`
-	Nickname      *string  `json:"nickname"`
-	RoleIDs       []string `json:"role_ids"`
-	JoinedAt      int64    `json:"joined_at"`
-	IsBot         bool     `json:"is_bot"`
+	ID            string            `json:"id"`
+	GuildID       string            `json:"guild_id"`
+	UserID        string            `json:"user_id"`
+	Username      string            `json:"username"`
+	Discriminator string            `json:"discriminator"`
+	GlobalName    *string           `json:"global_name"`
+	Nickname      *string           `json:"nickname"`
+	RoleIDs       []string          `json:"role_ids"`
+	JoinedAt      int64             `json:"joined_at"`
+	IsBot         bool              `json:"is_bot"`
+	Supplemental  MemberSearchExtra `json:"supplemental"`
 }
 
 // MemberSearchPage is one page of SearchMembers results. Indexing is true while the
