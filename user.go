@@ -5,7 +5,18 @@ import (
 	"net/http"
 )
 
+// Public user flags for User.Flags.
+const (
+	UserStaff                     = 1 << 0
+	UserPartner                   = 1 << 2
+	UserBugHunter                 = 1 << 3
+	UserFriendlyBot               = 1 << 4
+	UserFriendlyBotManualApproval = 1 << 5
+	UserSpammer                   = 1 << 6
+)
+
 // User is a Fluxer user account. GlobalName and Avatar are nil when the user has not set them.
+// MentionFlags is the user's reply mention preference, one of the Mention constants.
 type User struct {
 	ID            string  `json:"id"`
 	Username      string  `json:"username"`
@@ -16,6 +27,7 @@ type User struct {
 	Bot           bool    `json:"bot,omitempty"`
 	System        bool    `json:"system,omitempty"`
 	Flags         int64   `json:"flags,omitempty"`
+	MentionFlags  int     `json:"mention_flags,omitempty"`
 }
 
 // DisplayName returns the user's global name, or the username when no global name is set.
