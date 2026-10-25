@@ -145,13 +145,23 @@ type ThreadMetadata struct {
 	CreateTimestamp     time.Time `json:"create_timestamp,omitzero"`
 }
 
-// ThreadMember is a user's membership in a thread.
+// ThreadMember is a user's membership in a thread. Muted and MuteConfig are only set for
+// the current user.
 type ThreadMember struct {
-	ID            string    `json:"id,omitempty"`
-	UserID        string    `json:"user_id,omitempty"`
-	JoinTimestamp time.Time `json:"join_timestamp,omitzero"`
-	Flags         int       `json:"flags"`
-	Member        *Member   `json:"member,omitempty"`
+	ID            string      `json:"id,omitempty"`
+	UserID        string      `json:"user_id,omitempty"`
+	JoinTimestamp time.Time   `json:"join_timestamp,omitzero"`
+	Flags         int         `json:"flags"`
+	Muted         bool        `json:"muted,omitempty"`
+	MuteConfig    *MuteConfig `json:"mute_config,omitempty"`
+	Member        *Member     `json:"member,omitempty"`
+}
+
+// MuteConfig says until when a thread is muted, nil EndTime meaning until unmuted, and
+// the duration in seconds that was picked.
+type MuteConfig struct {
+	EndTime            *time.Time `json:"end_time"`
+	SelectedTimeWindow int        `json:"selected_time_window"`
 }
 
 // ForumTag is a tag that can be applied to posts in a forum channel. The emoji is set
