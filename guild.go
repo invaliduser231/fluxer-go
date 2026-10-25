@@ -134,19 +134,28 @@ func ImageData(contentType string, data []byte) string {
 }
 
 // GuildEdit holds the fields to change on a guild. Only non-nil fields are sent. Image
-// fields take a data URI from ImageData.
+// fields take a data URI from ImageData. Features is the complete feature list the guild
+// should have; Fluxer only changes the features owners may toggle.
 type GuildEdit struct {
-	Name                        *string `json:"name,omitempty"`
-	Icon                        *string `json:"icon,omitempty"`
-	Banner                      *string `json:"banner,omitempty"`
-	Splash                      *string `json:"splash,omitempty"`
-	SystemChannelID             *string `json:"system_channel_id,omitempty"`
-	SystemChannelFlags          *int    `json:"system_channel_flags,omitempty"`
-	AFKChannelID                *string `json:"afk_channel_id,omitempty"`
-	AFKTimeout                  *int    `json:"afk_timeout,omitempty"`
-	VerificationLevel           *int    `json:"verification_level,omitempty"`
-	DefaultMessageNotifications *int    `json:"default_message_notifications,omitempty"`
-	ExplicitContentFilter       *int    `json:"explicit_content_filter,omitempty"`
+	Name                        *string    `json:"name,omitempty"`
+	Icon                        *string    `json:"icon,omitempty"`
+	Banner                      *string    `json:"banner,omitempty"`
+	Splash                      *string    `json:"splash,omitempty"`
+	EmbedSplash                 *string    `json:"embed_splash,omitempty"`
+	SplashCardAlignment         *int       `json:"splash_card_alignment,omitempty"`
+	SystemChannelID             *string    `json:"system_channel_id,omitempty"`
+	SystemChannelFlags          *int       `json:"system_channel_flags,omitempty"`
+	AFKChannelID                *string    `json:"afk_channel_id,omitempty"`
+	AFKTimeout                  *int       `json:"afk_timeout,omitempty"`
+	VerificationLevel           *int       `json:"verification_level,omitempty"`
+	MFALevel                    *int       `json:"mfa_level,omitempty"`
+	NSFW                        *bool      `json:"nsfw,omitempty"`
+	ContentWarningLevel         *int       `json:"content_warning_level,omitempty"`
+	ContentWarningText          *string    `json:"content_warning_text,omitempty"`
+	DefaultMessageNotifications *int       `json:"default_message_notifications,omitempty"`
+	ExplicitContentFilter       *int       `json:"explicit_content_filter,omitempty"`
+	Features                    *[]string  `json:"features,omitempty"`
+	MessageHistoryCutoff        *time.Time `json:"message_history_cutoff,omitempty"`
 }
 
 // GuildQuery pages through the current user's guilds in Guilds. Before and After are
