@@ -373,7 +373,9 @@ type TypingStart struct {
 	Member    *Member `json:"member,omitempty"`
 }
 
-// VoiceState is the voice connection state of one user.
+// VoiceState is the voice connection state of one user. E2EECapable reports whether the
+// user's app supports end-to-end encrypted voice, P2P whether the connection sends media
+// directly to the other participants.
 type VoiceState struct {
 	GuildID          string   `json:"guild_id,omitempty"`
 	ChannelID        string   `json:"channel_id,omitempty"`
@@ -390,6 +392,8 @@ type VoiceState struct {
 	IsMobile         bool     `json:"is_mobile"`
 	Suppress         bool     `json:"suppress"`
 	ViewerStreamKeys []string `json:"viewer_stream_keys,omitempty"`
+	E2EECapable      bool     `json:"e2ee_capable,omitempty"`
+	P2P              bool     `json:"p2p,omitempty"`
 	Version          int64    `json:"version"`
 }
 
