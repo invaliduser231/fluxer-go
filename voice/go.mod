@@ -3,8 +3,8 @@ module github.com/invaliduser231/fluxer-go/voice
 go 1.26.8
 
 require (
-	github.com/invaliduser231/fluxer-go v0.1.0
-	github.com/livekit/protocol v1.53.0
+	github.com/invaliduser231/fluxer-go v0.2.0
+	github.com/livekit/protocol v1.53.1
 	github.com/livekit/server-sdk-go/v2 v2.19.0
 	github.com/pion/webrtc/v4 v4.2.25
 )
